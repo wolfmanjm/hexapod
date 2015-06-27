@@ -2,10 +2,14 @@
 
 #include <cstdint>
 
+
 //#define DUMMY 1
 
 #ifndef DUMMY
-#include "adafruitss.h"
+namespace upm {
+	class adafruitss;
+}
+class PWM;
 #else
 #include <stdio.h>
 class DummyServo
@@ -21,11 +25,12 @@ public:
 	Servo();
 	~Servo();
 	void move(uint8_t port, float rads);
-	void rawMove(uint8_t port, float angle);
+	void updateServo(uint8_t channel, float angle);
 
 private:
 #ifndef DUMMY
 	upm::adafruitss* servos;
+	PWM *pwm;
 #else
 	DummyServo* servos;
 #endif
