@@ -1,6 +1,7 @@
 #include "Servo.h"
 
 #include <cmath>
+#include <stdexcept>
 
 #ifndef DUMMY
 #include "adafruitss.h"
@@ -40,8 +41,10 @@ Servo::~Servo()
 #endif
 }
 
+#define NSERVOS 18
+
 // defines which servos need to be reversed
-static const char SERVO_REVERSE[] = {
+static const int8_t SERVO_REVERSE[NSERVOS] = {
     // ankle, knee, hip
     -1,  1, 1,    // front left
     -1,  1, 1,    // middle left
@@ -51,7 +54,8 @@ static const char SERVO_REVERSE[] = {
     -1,  1, 1     // front right
 };
 
-static const char SERVO_TRIM[] = {
+#ifndef DUMMY
+static const int8_t SERVO_TRIM[NSERVOS] = {
     // ankle, knee, hip
     10, 20,  0,    // front left
      0,  0,  0,    // middle left
@@ -60,24 +64,31 @@ static const char SERVO_TRIM[] = {
      0,  0,  0,    // middle right
     10, 20,  0     // front right
 };
+#else
+static const int8_t SERVO_TRIM[NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
+#endif
 
 void Servo::updateServo(uint8_t channel, float angle)
 {
+    if(channel >= NSERVOS) throw std::invalid_argument("channel");
+
 #ifndef DUMMY
-	if(channel >= 0 && channel <= 15) {
-		uint16_t a = roundf(angle);
-		servos->servo(channel, type, a);
-	}else{
-		pwm->setAngle(channel-16, angle);
-	}
+    if(channel >= 0 && channel <= 15) {
+        uint16_t a = roundf(angle);
+        servos->servo(channel, type, a);
+    }else{
+        pwm->setAngle(channel-16, angle);
+    }
 #else
-	servos->servo(channel, type, roundf(angle));
+    servos->servo(channel, type, roundf(angle));
 #endif
 }
 
 // Move a servo to a position in radians between -PI/2 and PI/2.
 void Servo::move(uint8_t channel, float rads)
 {
+    if(channel >= NSERVOS) throw std::invalid_argument("channel");
+
     rads = rads * SERVO_REVERSE[channel] + PI2;
     while (rads > TAU) {
         rads -= TAU;
@@ -86,12 +97,7 @@ void Servo::move(uint8_t channel, float rads)
         rads += TAU;
     }
 
-    float angle = (rads * 180.0F / M_PI) +
-#ifndef DUMMY
-                  SERVO_TRIM[channel];
-#else
-                  0;
-#endif
+    float angle = (rads * 180.0F / M_PI) + SERVO_TRIM[channel];
 
     //printf("rads %f, angle %f\n", rads, angle);
     updateServo(channel, angle);

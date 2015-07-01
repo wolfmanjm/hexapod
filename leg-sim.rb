@@ -34,6 +34,7 @@ $animate = false
 $stream_angle= false
 $stream_pos= false
 $mqttcon= nil
+$leg= 0
 
 SQRT2 = Math.sqrt(2.0)
 PI2 = Math::PI/2.0
@@ -44,10 +45,10 @@ TAU = Math::PI * 2.0
 $coxa = 36.5  # between the hip and the knee
 $femur = 32.5  # between the knee and the ankle
 $tibia = 65.0  # between the ankle and the foot
-$home= (($coxa + $femur) / SQRT2)
+$home= ($coxa + $femur)
 
 $legx= $home
-$legy= $home
+$legy= 0
 $legz= -$tibia
 
 $hip = 0
@@ -91,7 +92,7 @@ def _inverse_kinematics(x, y, z)
   hip = Math.atan2(y, x)
   knee = _solve_triangle($femur, d, $tibia) - Math.atan2(-z, f)
   ankle = _solve_triangle($femur, $tibia, d) - PI2
-  h= to_degrees(hip-PI4)
+  h= to_degrees(hip)
   k= to_degrees(knee)
   a= to_degrees(-ankle)
   print "x= #{x}, y= #{y}, z= #{z}, hip= #{h}, knee= #{k}, ankle= #{a}\n"
@@ -140,7 +141,7 @@ display = Proc.new do
   glPushMatrix()
 
   # base
-  glTranslate(1.0, -2.0, 0.0)
+  glTranslate(1.0, 0, 0.0)
   glPushMatrix()
   glScale(2.0, 4.0, 0.5)
   glColor3f(1,1,1)
@@ -148,8 +149,8 @@ display = Proc.new do
   glPopMatrix()
 
   # coxa
-  glTranslate(-1.0, 2.0, 0.0) # move to corner of base
-  glRotate($hip+135, 0.0, 0.0, -1.0)
+  glTranslate(-1.0, 0.0, 0.0) # move to corner of base
+  glRotate($hip+90, 0.0, 0.0, -1.0)
   glTranslate(1.0, 0.0, 0.0) # rotate around the end
 
   glPushMatrix()
@@ -217,9 +218,9 @@ keyboard = Proc.new do|key, x, y|
     glutPostRedisplay()
 
   when ?f
-    $fXDiff = 90
-    $fYDiff = 0
-    $fZDiff = 0
+    $fXDiff = 0
+    $fYDiff = -90
+    $fZDiff = 90
     glutPostRedisplay()
 
   when ?h
@@ -249,6 +250,10 @@ keyboard = Proc.new do|key, x, y|
 
   when ?w
     $animate= !$animate
+
+  when ?0, ?1, ?2, ?3, ?4, ?5
+    $leg= key.to_i
+    puts "Selected leg #{$leg}"
 
   when ?P
     $stream_angle= false
@@ -288,6 +293,7 @@ keyboard = Proc.new do|key, x, y|
     puts "f - front view"
     puts "P - toggle Position streaming"
     puts "R - toggle Angle Streaming"
+    puts "0-5 - select leg"
 
     puts "q, <esc> - Quit"
     puts "? - Help"
@@ -375,8 +381,8 @@ special = lambda do |key,x,y|
   end
 
   $hip, $knee, $ankle =  _inverse_kinematics($legx, $legy, $legz)
-  $mqttcon.publish('quadruped/commands', "A 0 #{$hip} #{$knee} #{$ankle}") if $stream_angle and $mqttcon
-  $mqttcon.publish('quadruped/commands', "P 0 #{$legx} #{$legy} #{$legz}") if $stream_pos and $mqttcon
+  $mqttcon.publish('quadruped/commands', "A #{$leg} #{$hip} #{$knee} #{$ankle}") if $stream_angle and $mqttcon
+  $mqttcon.publish('quadruped/commands', "P #{$leg} #{$legx} #{$legy} #{$legz}") if $stream_pos and $mqttcon
 end
 
 timer = lambda do |value|

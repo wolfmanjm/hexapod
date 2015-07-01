@@ -9,17 +9,22 @@
 
     +Z is up
 
-    leg positions
+ leg positions
 
-    0---------------3
-    |               |
-    |               |
-    |               |
-    |               |
-    |               |
-    1---------------2
+          0---------------5
+         /                 \
+        /                   \
+       /                     \
+      /                       \
+     /                         \
+    1                           4
+     \                         /
+      \                       /
+       \                     /
+        \                   /
+         \                 /
+          2---------------3
 
-    at Home position the legs are out at a diagonal
 
 */
 
@@ -33,7 +38,7 @@ const static float PI4 = M_PI_4;
 
 #define RADIANS(a) (a * M_PI / 180.0F)
 
-Leg::Leg(float pos_angle, int8_t x, int8_t y, uint8_t joint1, uint8_t joint2, uint8_t joint3, Servo &servo) : servo(servo)
+Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint8_t joint3, Servo &servo) : servo(servo)
 {
     // which servo
     this->joint[0] = joint1;
@@ -46,23 +51,27 @@ Leg::Leg(float pos_angle, int8_t x, int8_t y, uint8_t joint1, uint8_t joint2, ui
     mat[0][0]= cosf(r); mat[0][1]= -sinf(r);
     mat[1][0]= sinf(r); mat[1][1]= cosf(r);
 
-    this->xp= x;
-    this->yp= y;
+    r= RADIANS(home_angle);
+    home_mat[0][0]= cosf(r); home_mat[0][1]= -sinf(r);
+    home_mat[1][0]= sinf(r); home_mat[1][1]= cosf(r);
+
     home();
 }
 
 // transform x, y to match leg position
-void  Leg::transform(float& x, float& y)
+void  Leg::transform(float m[2][2], float& x, float& y)
 {
-    float nx= x * mat[0][0] + y * mat[1][0];
-    float ny= x * mat[0][1] + y * mat[1][1];
+    float nx= x * m[0][0] + y * m[1][0];
+    float ny= x * m[0][1] + y * m[1][1];
     x= nx;
     y= ny;
 }
 
+// all servos will be at 90°
 bool Leg::home()
 {
-    float x= xp, y= yp;
+    float x= COXA+FEMUR, y= 0;
+    transform(home_mat, x, y);
     return move(x, y, -TIBIA);
 }
 
@@ -78,10 +87,9 @@ float Leg::solveTriangle(float a, float b, float c)
     return acosf((a * a + b * b - c * c) / (2 * a * b));
 }
 
-std::tuple<float, float, float> Leg::inverseKinematics(float x, float y, float z)
+Leg::Vec3 Leg::inverseKinematics(float x, float y, float z)
 {
-    // Calculate angles for knee and ankle, and put them in those variables.
-    // Return true on success, and false if x and y are out of range.
+    // Calculate angles for knee and ankle
     float ankle, knee, hip;
     float f = norm(x, y) - COXA;
     float d = norm(f, z);
@@ -92,7 +100,12 @@ std::tuple<float, float, float> Leg::inverseKinematics(float x, float y, float z
     hip = atan2f(y, x);
     knee = solveTriangle(FEMUR, d, TIBIA) - atan2f(-z, f);
     ankle = solveTriangle(FEMUR, TIBIA, d) - PI2;
-    return std::make_tuple(hip, knee, ankle);
+    return Vec3(hip, knee, ankle);
+}
+
+bool Leg::move(float x, float y)
+{
+    return move(x, y, std::get<2>(position));
 }
 
 bool Leg::move(float x, float y, float z)
@@ -102,13 +115,10 @@ bool Leg::move(float x, float y, float z)
     float knee = NAN;
     float hip = NAN;
 
-
-    position[0] = x;
-    position[1] = y;
-    position[2] = z;
+    position= std::make_tuple(x, y, z);
 
     //printf("Move x:%f, y:%f, z:%f\n", x, y, z);
-    transform(x, y);
+    transform(mat, x, y);
     //printf("transformed Move x:%f, y:%f, z:%f\n", x, y, z);
 
     std::tie(hip, knee, ankle) = inverseKinematics(x, y, z);
@@ -116,7 +126,7 @@ bool Leg::move(float x, float y, float z)
         return false;
     }
 
-    hip -= PI4;
+    //hip -= PI4;
     servo.move(joint[0], ankle);
     servo.move(joint[1], knee);
     servo.move(joint[2], hip);
@@ -126,17 +136,18 @@ bool Leg::move(float x, float y, float z)
 bool Leg::moveBy(float dx, float dy, float dz)
 {
     // Move the tip of the leg by dx, dy. Return false when out of range.
-    return move( position[0] + dx,
-                 position[1] + dy,
-                 position[2] + dz);
+    return move( std::get<0>(position) + dx,
+                 std::get<1>(position) + dy,
+                 std::get<2>(position) + dz);
 }
 
 bool Leg::rotateBy(float rad)
 {
     // Rotate the tip of the leg around the center of robot's body.
-    float x = position[0] + BASE;
-    float y = position[1] + BASE;
-    float nx = x * cosf(rad) - y * sinf(rad) - BASE;
-    float ny = x * sinf(rad) + y * cosf(rad) - BASE;
-    return move(nx, ny, position[2]);
+    // TODO this maybe incorrect for a hexagon shaped body
+    float x = std::get<0>(position) + BASE_RADIUS;
+    float y = std::get<1>(position) + BASE_RADIUS;
+    float nx = x * cosf(rad)  + y * sinf(rad) - BASE_RADIUS;
+    float ny = x * -sinf(rad) + y * cosf(rad) - BASE_RADIUS;
+    return move(nx, ny, std::get<2>(position));
 }
