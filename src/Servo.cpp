@@ -15,7 +15,7 @@ Servo::Servo()
 {
 #ifndef DUMMY
 	const int freqhz= 60;
-    servos = new upm::adafruitss(6, 0x40);
+    servos = new adafruitss(6, 0x40);
     servos->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
     // ss 1.787 90°
     // PWM 1.51 90°
@@ -31,6 +31,9 @@ Servo::Servo()
 #else
     servos = new DummyServo();
 #endif
+    for (int i = 0; i < NSERVOS; ++i) {
+        current_angle[i]= 9999.9; // set to an angle we would never have set
+    }
 }
 
 Servo::~Servo()
@@ -41,10 +44,8 @@ Servo::~Servo()
 #endif
 }
 
-#define NSERVOS 18
-
 // defines which servos need to be reversed
-static const int8_t SERVO_REVERSE[NSERVOS] = {
+static const int8_t SERVO_REVERSE[Servo::NSERVOS] = {
     // ankle, knee, hip
     -1,  1, 1,    // front left
     -1,  1, 1,    // middle left
@@ -55,32 +56,36 @@ static const int8_t SERVO_REVERSE[NSERVOS] = {
 };
 
 #ifndef DUMMY
-static const int8_t SERVO_TRIM[NSERVOS] = {
+static const int8_t SERVO_TRIM[Servo::NSERVOS] = {
     // ankle, knee, hip
-    10, 20,  0,    // front left
-     0,  0,  0,    // middle left
-     0,  0,  0,    // back left
-     0,  0,  0,    // back right
-     0,  0,  0,    // middle right
-    10, 20,  0     // front right
+     10, 20,   0,    // front left
+     20, 20,   0,    // middle left
+      0,  0, -15,    // back left
+     20, 20,   0,    // back right
+     20, 30, -10,    // middle right
+     10, 30,  15     // front right
 };
 #else
-static const int8_t SERVO_TRIM[NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
+static const int8_t SERVO_TRIM[Servo::NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
 #endif
 
 void Servo::updateServo(uint8_t channel, float angle)
 {
     if(channel >= NSERVOS) throw std::invalid_argument("channel");
 
+    // check if any change to avoid unecessary I2C traffic
+    if(angle == current_angle[channel]) return;
+
+    current_angle[channel]= angle;
+
 #ifndef DUMMY
     if(channel >= 0 && channel <= 15) {
-        uint16_t a = roundf(angle);
-        servos->servo(channel, type, a);
+        servos->servo(channel, type, angle);
     }else{
         pwm->setAngle(channel-16, angle);
     }
 #else
-    servos->servo(channel, type, roundf(angle));
+    servos->servo(channel, type, angle);
 #endif
 }
 

@@ -28,6 +28,8 @@ public:
 	bool move(float x, float y);
 	bool moveBy(float dx, float dy, float dz);
 	bool rotateBy(float rad);
+	bool onGround() const { return on_ground; }
+	bool setOnGround(bool flg) { on_ground= flg; }
 
 	using Vec3 = std::tuple<float, float, float>;
 	Vec3 getPosition() const { return position; }
@@ -44,4 +46,5 @@ private:
 	float home_mat[2][2];
 	Vec3 position;
 	uint8_t joint[3];
+	bool on_ground;
 };

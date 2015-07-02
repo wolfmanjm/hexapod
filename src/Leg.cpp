@@ -54,7 +54,7 @@ Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint
     r= RADIANS(home_angle);
     home_mat[0][0]= cosf(r); home_mat[0][1]= -sinf(r);
     home_mat[1][0]= sinf(r); home_mat[1][1]= cosf(r);
-
+    on_ground= true;
     home();
 }
 

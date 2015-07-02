@@ -98,7 +98,8 @@ include_dirs = ["#{INCROOT}/opt/include/upm", "#{INCROOT}/opt/include", "./inclu
 
 INCLUDE = (include_dirs).collect { |d| "-I#{d}" }.join(" ")
 
-libs = ['upm-adafruitss', 'mosquitto', 'mraa']
+#libs = ['upm-adafruitss', 'mosquitto', 'mraa']
+libs = ['mosquitto', 'mraa']
 LIBS = libs.flatten.collect{ |l| "-l#{l}" }.join(' ')
 
 defines= []
