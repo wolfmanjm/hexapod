@@ -225,6 +225,7 @@ void initLegs(std::vector<Pos2> pos, bool relative= true)
 
 }
 
+// wave gait. setup so it moves +/-stride/2 around the home position
 void waveGait(int reps, float stride, float speed)
 {
 	float half_stride= stride/2; // half stride in mm
@@ -243,6 +244,7 @@ void waveGait(int reps, float stride, float speed)
 		Pos2(5, 0, half_stride)
 	});
 
+#if 0
 	for (int i = 0; i < reps; ++i) {
 		// step 1
    		raiseLeg(2, true, raise, raise_speed);
@@ -316,6 +318,32 @@ void waveGait(int reps, float stride, float speed)
 			speed, true);
    		raiseLeg(5, false, raise, raise_speed);
 	}
+
+#else
+	const uint8_t legorder[]{2, 1, 0, 3, 4, 5};
+
+	for (int i = 0; i < reps; ++i) {
+
+		for (int s = 0; s < 6; ++s) { // foreach step
+			uint8_t leg= legorder[s];
+			std:std::vector<Pos3> v;
+
+			// reset the leg
+			v.push_back(Pos3(leg, 0, stride, 0));
+
+			// setup for moving other legs backwards
+			for (int l = 0; l < 6; ++l) { // for each leg
+				if(l != leg) v.push_back(Pos3(l, 0, -stride_inc, 0));
+			}
+
+			// execute actual step
+	   		raiseLeg(leg, true, raise, raise_speed);
+			interpolatedMoves(v, speed, true);
+	   		raiseLeg(leg, false, raise, raise_speed);
+	   	}
+
+	}
+#endif
 
 }
 

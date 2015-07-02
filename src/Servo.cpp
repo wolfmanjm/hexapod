@@ -73,6 +73,8 @@ void Servo::updateServo(uint8_t channel, float angle)
 {
     if(channel >= NSERVOS) throw std::invalid_argument("channel");
 
+    if(angle < 0 || angle > 180) printf("WARNING: angle is too big for channel %d, %f\n", channel ,angle);
+
     // check if any change to avoid unecessary I2C traffic
     if(angle == current_angle[channel]) return;
 
