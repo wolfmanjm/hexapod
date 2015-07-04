@@ -202,6 +202,17 @@ void raiseLeg(int leg, bool lift= true, int raise=32, float speed= 60)
 	interpolatedMoves({Pos3(leg, 0, 0, lift ? raise : -raise)}, speed, true, true);
 }
 
+void raiseLegs(std::vector<int> legn, bool lift= true, int raise=32, float speed= 60)
+{
+	std::vector<Pos3> v;
+	for(int leg : legn) {
+		legs[leg].setOnGround(!lift);
+		v.push_back(Pos3(leg, 0, 0, lift ? raise : -raise));
+	}
+
+	interpolatedMoves(v, speed, true, true);
+}
+
 // initialize legs to the specified positions
 void initLegs(std::vector<Pos2> pos, bool relative= true)
 {
@@ -225,6 +236,55 @@ void initLegs(std::vector<Pos2> pos, bool relative= true)
 
 }
 
+// tripod gait. setup so it moves +/-stride/2 around the home position
+void tripodGait(int reps, float stride, float speed)
+{
+	float half_stride= stride/2; // half stride in mm
+	float raise= 25;
+	float raise_speed= 200;
+
+	using v3= std::tuple<uint8_t, uint8_t, uint8_t>;
+	const v3 legorder[]{v3(0, 2, 4), v3(1, 3, 5)};
+
+	// set legs to initial positions from home positions
+	home();
+	initLegs({
+		Pos2(std::get<0>(legorder[0]), 0, -half_stride),
+		Pos2(std::get<1>(legorder[0]), 0, -half_stride),
+		Pos2(std::get<2>(legorder[0]), 0, -half_stride),
+		Pos2(std::get<0>(legorder[1]), 0, half_stride),
+		Pos2(std::get<1>(legorder[1]), 0, half_stride),
+		Pos2(std::get<2>(legorder[1]), 0, half_stride)
+	});
+
+
+	for (int i = 0; i < reps; ++i) {
+		// execute step state 1
+   		raiseLegs({std::get<0>(legorder[0]), std::get<1>(legorder[0]), std::get<2>(legorder[0])}, true, raise, raise_speed);
+		interpolatedMoves({
+			Pos3(std::get<0>(legorder[0]), 0, stride, 0),
+			Pos3(std::get<1>(legorder[0]), 0, stride, 0),
+			Pos3(std::get<2>(legorder[0]), 0, stride, 0),
+			Pos3(std::get<0>(legorder[1]), 0, -stride, 0),
+			Pos3(std::get<1>(legorder[1]), 0, -stride, 0),
+			Pos3(std::get<2>(legorder[1]), 0, -stride, 0)},
+			speed, true);
+   		raiseLegs({std::get<0>(legorder[0]), std::get<1>(legorder[0]), std::get<2>(legorder[0])}, false, raise, raise_speed);
+
+   		// execute step state 2
+  		raiseLegs({std::get<0>(legorder[1]), std::get<1>(legorder[1]), std::get<2>(legorder[1])}, true, raise, raise_speed);
+		interpolatedMoves({
+			Pos3(std::get<0>(legorder[1]), 0, stride, 0),
+			Pos3(std::get<1>(legorder[1]), 0, stride, 0),
+			Pos3(std::get<2>(legorder[1]), 0, stride, 0),
+			Pos3(std::get<0>(legorder[0]), 0, -stride, 0),
+			Pos3(std::get<1>(legorder[0]), 0, -stride, 0),
+			Pos3(std::get<2>(legorder[0]), 0, -stride, 0)},
+			speed, true);
+   		raiseLegs({std::get<0>(legorder[1]), std::get<1>(legorder[1]), std::get<2>(legorder[1])}, false, raise, raise_speed);
+	}
+}
+
 // wave gait. setup so it moves +/-stride/2 around the home position
 void waveGait(int reps, float stride, float speed)
 {
@@ -244,82 +304,6 @@ void waveGait(int reps, float stride, float speed)
 		Pos2(5, 0, half_stride)
 	});
 
-#if 0
-	for (int i = 0; i < reps; ++i) {
-		// step 1
-   		raiseLeg(2, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(2, 0, stride, 0),
-			Pos3(1, 0, -stride_inc, 0),
-			Pos3(0, 0, -stride_inc, 0),
-			Pos3(3, 0, -stride_inc, 0),
-			Pos3(4, 0, -stride_inc, 0),
-			Pos3(5, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(2, false, raise, raise_speed);
-
-   		// step 2
-  		raiseLeg(1, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(1, 0, stride, 0),
-			Pos3(2, 0, -stride_inc, 0),
-			Pos3(0, 0, -stride_inc, 0),
-			Pos3(3, 0, -stride_inc, 0),
-			Pos3(4, 0, -stride_inc, 0),
-			Pos3(5, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(1, false, raise, raise_speed);
-
-   		// step 3
- 		raiseLeg(0, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(0, 0, stride, 0),
-			Pos3(1, 0, -stride_inc, 0),
-			Pos3(2, 0, -stride_inc, 0),
-			Pos3(3, 0, -stride_inc, 0),
-			Pos3(4, 0, -stride_inc, 0),
-			Pos3(5, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(0, false, raise, raise_speed);
-
-  		// step 4
- 		raiseLeg(3, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(3, 0, stride, 0),
-			Pos3(0, 0, -stride_inc, 0),
-			Pos3(1, 0, -stride_inc, 0),
-			Pos3(2, 0, -stride_inc, 0),
-			Pos3(4, 0, -stride_inc, 0),
-			Pos3(5, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(3, false, raise, raise_speed);
-
-  		// step 5
- 		raiseLeg(4, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(4, 0, stride, 0),
-			Pos3(0, 0, -stride_inc, 0),
-			Pos3(1, 0, -stride_inc, 0),
-			Pos3(2, 0, -stride_inc, 0),
-			Pos3(3, 0, -stride_inc, 0),
-			Pos3(5, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(4, false, raise, raise_speed);
-
- 		// step 6
- 		raiseLeg(5, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(5, 0, stride, 0),
-			Pos3(0, 0, -stride_inc, 0),
-			Pos3(1, 0, -stride_inc, 0),
-			Pos3(2, 0, -stride_inc, 0),
-			Pos3(3, 0, -stride_inc, 0),
-			Pos3(4, 0, -stride_inc, 0)},
-			speed, true);
-   		raiseLeg(5, false, raise, raise_speed);
-	}
-
-#else
 	const uint8_t legorder[]{2, 1, 0, 3, 4, 5};
 
 	for (int i = 0; i < reps; ++i) {
@@ -343,11 +327,26 @@ void waveGait(int reps, float stride, float speed)
 	   	}
 
 	}
-#endif
 
 }
 
 #if 0
+#include <tuple>
+#include <utility>
+
+template<std::size_t I = 0, typename FuncT, typename... Tp>
+inline typename std::enable_if<I == sizeof...(Tp), void>::type
+  for_each(std::tuple<Tp...> &, FuncT) // Unused arguments are given no names.
+  { }
+
+template<std::size_t I = 0, typename FuncT, typename... Tp>
+inline typename std::enable_if<I < sizeof...(Tp), void>::type
+  for_each(std::tuple<Tp...>& t, FuncT f)
+  {
+    f(std::get<I>(t));
+    for_each<I + 1, FuncT, Tp...>(t, f);
+  }
+
 #include "ConcurrentQueue.h"
 #include <iostream>
 
@@ -431,6 +430,16 @@ bool handle_request(const char *req)
 	return true;
 }
 
+void rawMove(int leg, int joint, float x, float y, float z, bool absol= false)
+{
+	if(leg >= 0 && joint < 0){
+		if(absol) legs[leg].move(x, y, z);
+		else legs[leg].moveBy(x, y, z);
+	}else if(leg >= 0 && joint >= 0) {
+		servo.move((leg*3)+joint, (x * M_PI / 180.0) - M_PI_2);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	int reps = 0;
@@ -438,10 +447,9 @@ int main(int argc, char *argv[])
 	int leg= -1, joint= -1;
 	float x=0, y=0, z=0;
 	float speed= 10; // 10mm/sec default speed
-	bool rawmove= false;
-	bool abs= false;
+	bool absol= false;
 	bool do_walk= false;
-	float stride= 30;
+	uint8_t gait= 0;
 
 	timeInit();
 
@@ -472,7 +480,7 @@ int main(int argc, char *argv[])
 				printf(" -R raw move to x y z\n");
 				printf(" -I interpolated move to xyz for leg at speed mm/sec\n");
 				printf(" -L n raise leg or lower leg based on n\n");
-				printf(" -W n walk with stride n\n");
+				printf(" -W n walk with stride set by -y, speed set by -s, using gait n where 0: wave, 1: tripod\n");
 				return 1;
 
 			case 'H': mqtt_start(optarg, handle_request); break;
@@ -483,7 +491,7 @@ int main(int argc, char *argv[])
 
 			case 'f': update_frequency= atof(optarg); break;
 
-			case 'a': abs= true; break;
+			case 'a': absol= true; break;
 			case 's': speed= atof(optarg); break;
 			case 'm':
 				home(leg);
@@ -493,7 +501,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'W':
 				do_walk= true;
-				stride= atof(optarg);
+				gait= atoi(optarg);
 				break;
 
 			case 'l':
@@ -512,7 +520,9 @@ int main(int argc, char *argv[])
 				z= atof(optarg);
 				break;
 
-			case 'R': rawmove= true; break;
+			case 'R':
+				rawMove(leg, joint, x, y, z, absol);
+				break;
 
 			case 'T':
 				//           leg, x, y
@@ -545,18 +555,17 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(rawmove) {
-		if(leg >= 0 && joint < 0){
-			if(abs) legs[leg].move(x, y, z);
-			else legs[leg].moveBy(x, y, z);
-		}else if(leg >= 0 && joint >= 0) {
-			servo.move((leg*3)+joint, (x * M_PI / 180.0) - M_PI_2);
+	if(do_walk){
+		if(y == 0) y= 30;
+		if(gait == 0){
+			waveGait(reps, y, speed);
+		}else if(gait == 1) {
+			tripodGait(reps, y, speed);
+		}else{
+			printf("Unknown Gait %d\n", gait);
 		}
-
-	}else if(do_walk){
-		waveGait(reps, stride, speed);
 	}
 
-	printf("Hit any key...\n"); getchar();
+	//printf("Hit any key...\n"); getchar();
 	return 0;
 }

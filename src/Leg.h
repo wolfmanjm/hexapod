@@ -9,7 +9,7 @@ class Servo;
 #define	COXA 36.5F
 #define	FEMUR 32.5F
 #define	TIBIA 65.0F
-#define	BASE_RADIUS 100.0F
+#define	BASE_RADIUS (134/2+26.5)
 #define	HOME ((COXA + FEMUR) / M_SQRT2)
 
 class Leg

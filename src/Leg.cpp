@@ -105,7 +105,11 @@ Leg::Vec3 Leg::inverseKinematics(float x, float y, float z)
 
 bool Leg::move(float x, float y)
 {
-    return move(x, y, std::get<2>(position));
+    if(!move(x, y, std::get<2>(position))) {
+        printf("move out of range: %f, %f, %f\n", x, y, std::get<2>(position));
+        return false;
+    }
+    return true;
 }
 
 bool Leg::move(float x, float y, float z)
@@ -123,6 +127,7 @@ bool Leg::move(float x, float y, float z)
 
     std::tie(hip, knee, ankle) = inverseKinematics(x, y, z);
     if(isnan(hip) || isnan(knee) || isnan(ankle)) {
+        printf("move out of range: %f, %f, %f\n", x, y, z);
         return false;
     }
 
