@@ -15,6 +15,8 @@ class Servo;
 class Leg
 {
 public:
+	using Vec3 = std::tuple<float, float, float>;
+
 	Leg(float pos, float home_angle, uint8_t joint0, uint8_t joint1, uint8_t joint2, Servo& servo);
 
 	// must not allow copies of this Leg to be used accidently
@@ -28,10 +30,11 @@ public:
 	bool move(float x, float y);
 	bool moveBy(float dx, float dy, float dz);
 	bool rotateBy(float rad);
+	Vec3 calcRotation(float rad) const;
+
 	bool onGround() const { return on_ground; }
 	bool setOnGround(bool flg) { on_ground= flg; }
 
-	using Vec3 = std::tuple<float, float, float>;
 	Vec3 getPosition() const { return position; }
 
 private:
@@ -45,6 +48,7 @@ private:
 	float mat[2][2];
 	float home_mat[2][2];
 	Vec3 position;
+	float origin[2];
 	uint8_t joint[3];
 	bool on_ground;
 };

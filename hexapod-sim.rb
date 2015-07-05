@@ -154,25 +154,44 @@ def do_rotate_leg(l, dr)
   $legs[l][:ankle]= ankle
 end
 
-$liftleg= -1
-$rcnt= 10
+#$liftleg= -1
+#$rcnt= 10
+$step= 0
+$itcnt= 0
 def walk
-  dr= 0.5
-  (0..5).each do |l|
-    if l != $liftleg
-      do_rotate_leg(l, dr)
-    else
-      do_rotate_leg(l, -dr*5)
+  dr= 0.05
+  # dr= 0.5
+  # (0..5).each do |l|
+  #   if l != $liftleg
+  #     do_rotate_leg(l, dr)
+  #   else
+  #     do_rotate_leg(l, -dr*5)
+  #   end
+  # end
+  # $rcnt+=1
+  # if $rcnt > 10
+  #   $legs[$liftleg][:pos][2] -= 20 if($liftleg >= 0)
+  #   $liftleg+=1
+  #   $liftleg= 0 if($liftleg > 5)
+  #   $legs[$liftleg][:pos][2] += 20
+  #   $rcnt= 0
+  # end
+
+ # $legs[$step][:pos][2] += 20
+     (0..5).each do |l| # foreach leg
+      if l != $step
+        do_rotate_leg(l, dr)
+      else
+        do_rotate_leg(l, -dr*10)
+      end
     end
-  end
-  $rcnt+=1
-  if $rcnt > 10
-    $legs[$liftleg][:pos][2] -= 20 if($liftleg >= 0)
-    $liftleg+=1
-    $liftleg= 0 if($liftleg > 5)
-    $legs[$liftleg][:pos][2] += 20
-    $rcnt= 0
-  end
+    $itcnt += 1
+    if $itcnt > 6
+      $step += 1
+      $step= 0 if $step > 5
+      $itcnt= 0
+    end
+ # $legs[$step][:pos][2] -= 20
 end
 
 #

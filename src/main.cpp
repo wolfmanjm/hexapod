@@ -236,6 +236,61 @@ void initLegs(std::vector<Pos2> pos, bool relative= true)
 
 }
 
+// rotate about robot center
+void rotateGait(int reps, float angle, float speed)
+{
+	float raise= 30;
+	float raise_speed= 200;
+
+	home();
+	// initialize legs to start positions
+	float half_angle= angle/2;
+	float rotate_inc= angle/5; // the amount it rotates per step
+	for (int l = 0; l < 6; ++l) {
+		raiseLeg(l, true, 20, 100);
+		float a= half_angle-(rotate_inc*l);
+		//printf("angle: %f\n", a);
+		legs[l].rotateBy(RADIANS(-a));
+		raiseLeg(l, false, 20, 100);
+	}
+
+	// figure out speed of rotation
+	// calculate the distance moved for 1° based on leg 0
+	// then figure out how many degrees to move per iteration to get close to that speed
+	float rad= RADIANS(1);
+	float x= std::get<0>(legs[0].getPosition());
+	float y= std::get<1>(legs[0].getPosition());
+	float tx, ty, tz;
+    std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // TODO maybe check each leg
+    float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2));
+
+    float slice= speed/(dist*update_frequency); // the slice period based on speed and update frequency
+	int iterations= roundf(1.0F/slice); // number of iterations
+	float da= rotate_inc/iterations; // delta angle to move each step
+	float ra= angle/iterations; // delta angle to move each iteration for reset
+    printf("Distance moved for 1°: %f, iterations: %d, da: %f\n", dist, iterations, da);
+
+	// basically ripple legs around
+	for (int i = 0; i < reps; ++i) {
+		for (int s = 0; s < 6; ++s) { // foreach step
+			raiseLeg(s, true, raise, raise_speed);
+			for (int j = 0; j < iterations; ++j) {
+			    unsigned long t1= micros();
+				for (int l = 0; l < 6; ++l) {
+					if(l != s)
+						legs[l].rotateBy(RADIANS(-da));
+					else
+						legs[l].rotateBy(RADIANS(ra));
+				}
+				unsigned long t2= micros();
+				// adjust for length of time it took above
+				usleep(1000000/update_frequency - (t2-t1));
+			}
+			raiseLeg(s, false, raise, raise_speed);
+		}
+	}
+}
+
 // tripod gait. setup so it moves +/-stride/2 around the home position
 void tripodGait(int reps, float stride, float speed)
 {
@@ -480,7 +535,7 @@ int main(int argc, char *argv[])
 				printf(" -R raw move to x y z\n");
 				printf(" -I interpolated move to xyz for leg at speed mm/sec\n");
 				printf(" -L n raise leg or lower leg based on n\n");
-				printf(" -W n walk with stride set by -y, speed set by -s, using gait n where 0: wave, 1: tripod\n");
+				printf(" -W n walk with stride set by -y, speed set by -s, using gait n where 0: wave, 1: tripod, 3: rotate\n");
 				return 1;
 
 			case 'H': mqtt_start(optarg, handle_request); break;
@@ -557,12 +612,11 @@ int main(int argc, char *argv[])
 
 	if(do_walk){
 		if(y == 0) y= 30;
-		if(gait == 0){
-			waveGait(reps, y, speed);
-		}else if(gait == 1) {
-			tripodGait(reps, y, speed);
-		}else{
-			printf("Unknown Gait %d\n", gait);
+		switch(gait) {
+			case 0:	waveGait(reps, y, speed); break;
+			case 1:	tripodGait(reps, y, speed); break;
+			case 2:	rotateGait(reps, x, speed); break;
+			default: printf("Unknown Gait %d\n", gait);
 		}
 	}
 

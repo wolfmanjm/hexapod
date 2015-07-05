@@ -55,6 +55,11 @@ Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint
     home_mat[0][0]= cosf(r); home_mat[0][1]= -sinf(r);
     home_mat[1][0]= sinf(r); home_mat[1][1]= cosf(r);
     on_ground= true;
+
+    // figure out the origin of the hip joint in robot coordinates, which is -x to right and +y up same as leg coordinates
+    origin[0]= BASE_RADIUS * cosf(RADIANS(pos_angle)); // X
+    origin[1]= BASE_RADIUS * sinf(RADIANS(pos_angle)); // Y
+
     home();
 }
 
@@ -146,13 +151,21 @@ bool Leg::moveBy(float dx, float dy, float dz)
                  std::get<2>(position) + dz);
 }
 
-bool Leg::rotateBy(float rad)
+Leg::Vec3 Leg::calcRotation(float rad) const
 {
     // Rotate the tip of the leg around the center of robot's body.
-    // TODO this maybe incorrect for a hexagon shaped body
-    float x = std::get<0>(position) + BASE_RADIUS;
-    float y = std::get<1>(position) + BASE_RADIUS;
-    float nx = x * cosf(rad)  + y * sinf(rad) - BASE_RADIUS;
-    float ny = x * -sinf(rad) + y * cosf(rad) - BASE_RADIUS;
-    return move(nx, ny, std::get<2>(position));
+    float x = std::get<0>(position) + origin[0];
+    float y = std::get<1>(position) + origin[1];
+    float nx = x *  cosf(rad) + y * sinf(rad);
+    float ny = x * -sinf(rad) + y * cosf(rad);
+    nx -=  origin[0];
+    ny -=  origin[1];
+    return Vec3(nx, ny, std::get<2>(position));
+}
+
+bool Leg::rotateBy(float rad)
+{
+    float x, y, z;
+    std::tie(x, y, z)= calcRotation(rad);
+    return move(x, y, z);
 }
