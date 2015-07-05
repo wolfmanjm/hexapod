@@ -223,7 +223,7 @@ void initLegs(std::vector<Pos2> pos, bool relative= true)
 		std::tie(leg, x, y) = i;
 		//printf("move leg: %d, x: %f, y: %f relative %d\n", leg, x, y, relative);
 		//printf("Raise leg %d\n", leg);
-		raiseLeg(leg, true, 32, 100);
+		raiseLeg(leg, true, 25, 300);
 		if(relative)
 			legs[leg].moveBy(x, y, 0);
 		else
@@ -231,13 +231,13 @@ void initLegs(std::vector<Pos2> pos, bool relative= true)
 
 		// lower leg
 		//printf("Lower leg %d\n", leg);
-		raiseLeg(leg, false, 32, 100);
+		raiseLeg(leg, false, 25, 300);
 	}
 
 }
 
-// rotate about robot center
-void rotateGait(int reps, float angle, float speed)
+// rotate about robot center using a ripple gait
+void rotateRippleGait(int reps, float angle, float speed)
 {
 	float raise= 30;
 	float raise_speed= 200;
@@ -255,20 +255,18 @@ void rotateGait(int reps, float angle, float speed)
 	}
 
 	// figure out speed of rotation
-	// calculate the distance moved for 1° based on leg 0
-	// then figure out how many degrees to move per iteration to get close to that speed
-	float rad= RADIANS(1);
+	// calculate the approximate distance moved for the given angle on leg 0
+	float rad= RADIANS(angle);
 	float x= std::get<0>(legs[0].getPosition());
 	float y= std::get<1>(legs[0].getPosition());
 	float tx, ty, tz;
     std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // TODO maybe check each leg
-    float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2));
+    float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2)); // the distance 1° moves the leg
 
-    float slice= speed/(dist*update_frequency); // the slice period based on speed and update frequency
-	int iterations= roundf(1.0F/slice); // number of iterations
+	int iterations= roundf((dist*update_frequency)/speed); // number of iterations
 	float da= rotate_inc/iterations; // delta angle to move each step
 	float ra= angle/iterations; // delta angle to move each iteration for reset
-    printf("Distance moved for 1°: %f, iterations: %d, da: %f\n", dist, iterations, da);
+    printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
 
 	// basically ripple legs around
 	for (int i = 0; i < reps; ++i) {
@@ -288,6 +286,81 @@ void rotateGait(int reps, float angle, float speed)
 			}
 			raiseLeg(s, false, raise, raise_speed);
 		}
+	}
+}
+// rotate about robot center using a tripod gait
+void rotateTripodGait(int reps, float angle, float speed)
+{
+	float raise= 25;
+	float raise_speed= 200;
+	float half_angle= angle/2;
+	using v3= std::tuple<uint8_t, uint8_t, uint8_t>;
+	const v3 legorder[]{v3(0, 2, 4), v3(1, 3, 5)};
+	std::vector<Pos2> v2;
+	float tx, ty, tz;
+
+	home();
+
+	// initialize legs to start positions
+	int l;
+	l= std::get<0>(legorder[0]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(-half_angle)); v2.push_back(Pos2(l, tx, ty));
+	l= std::get<1>(legorder[0]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(-half_angle)); v2.push_back(Pos2(l, tx, ty));
+	l= std::get<2>(legorder[0]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(-half_angle)); v2.push_back(Pos2(l, tx, ty));
+	l= std::get<0>(legorder[1]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(half_angle)); v2.push_back(Pos2(l, tx, ty));
+	l= std::get<1>(legorder[1]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(half_angle)); v2.push_back(Pos2(l, tx, ty));
+	l= std::get<2>(legorder[1]); std::tie(tx, ty, std::ignore)= legs[l].calcRotation(RADIANS(half_angle)); v2.push_back(Pos2(l, tx, ty));
+	initLegs(v2, false); // we have absolute positions
+
+	// figure out speed of rotation
+	// calculate the distance moved for the given angle on leg 0
+	float rad= RADIANS(angle);
+	float x= std::get<0>(legs[0].getPosition());
+	float y= std::get<1>(legs[0].getPosition());
+    std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // TODO maybe check each leg
+    float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2)); // the distance 1° moves the leg
+
+	int iterations= roundf((dist*update_frequency)/speed); // number of iterations
+	float da= angle/iterations; // delta angle to move each iteration
+	printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
+
+	for (int i = 0; i < reps; ++i) {
+		// first phase
+   		raiseLegs({std::get<0>(legorder[0]), std::get<1>(legorder[0]), std::get<2>(legorder[0])}, true, raise, raise_speed);
+		for (int j = 0; j < iterations; ++j) {
+		    unsigned long t1= micros();
+
+			legs[std::get<0>(legorder[0])].rotateBy(RADIANS(da));
+			legs[std::get<1>(legorder[0])].rotateBy(RADIANS(da));
+			legs[std::get<2>(legorder[0])].rotateBy(RADIANS(da));
+
+			legs[std::get<0>(legorder[1])].rotateBy(RADIANS(-da));
+			legs[std::get<1>(legorder[1])].rotateBy(RADIANS(-da));
+			legs[std::get<2>(legorder[1])].rotateBy(RADIANS(-da));
+
+			unsigned long t2= micros();
+			// adjust for length of time it took above
+			usleep(1000000/update_frequency - (t2-t1));
+		}
+   		raiseLegs({std::get<0>(legorder[0]), std::get<1>(legorder[0]), std::get<2>(legorder[0])}, false, raise, raise_speed);
+
+   		// second phase
+  		raiseLegs({std::get<0>(legorder[1]), std::get<1>(legorder[1]), std::get<2>(legorder[1])}, true, raise, raise_speed);
+		for (int j = 0; j < iterations; ++j) {
+		    unsigned long t1= micros();
+
+			legs[std::get<0>(legorder[1])].rotateBy(RADIANS(da));
+			legs[std::get<1>(legorder[1])].rotateBy(RADIANS(da));
+			legs[std::get<2>(legorder[1])].rotateBy(RADIANS(da));
+
+			legs[std::get<0>(legorder[0])].rotateBy(RADIANS(-da));
+			legs[std::get<1>(legorder[0])].rotateBy(RADIANS(-da));
+			legs[std::get<2>(legorder[0])].rotateBy(RADIANS(-da));
+
+			unsigned long t2= micros();
+			// adjust for length of time it took above
+			usleep(1000000/update_frequency - (t2-t1));
+		}
+   		raiseLegs({std::get<0>(legorder[1]), std::get<1>(legorder[1]), std::get<2>(legorder[1])}, false, raise, raise_speed);
 	}
 }
 
@@ -615,7 +688,8 @@ int main(int argc, char *argv[])
 		switch(gait) {
 			case 0:	waveGait(reps, y, speed); break;
 			case 1:	tripodGait(reps, y, speed); break;
-			case 2:	rotateGait(reps, x, speed); break;
+			case 2:	rotateRippleGait(reps, x, speed); break;
+			case 3:	rotateTripodGait(reps, x, speed); break;
 			default: printf("Unknown Gait %d\n", gait);
 		}
 	}
