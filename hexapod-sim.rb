@@ -131,6 +131,19 @@ end
 # Test stuff
 #
 
+def do_move_leg_by(l, dx, dy, dz)
+  x, y, z= $legs[l][:pos]
+  $legs[l][:pos]= [x+dx, y+dy, z+dz]
+
+  # transform into leg coordinates
+  x, y= transform($legs[l][:rot], $legs[l][:pos][0], $legs[l][:pos][1])
+  z= $legs[l][:pos][2]
+  hip, knee, ankle =  _inverse_kinematics(x, y, z)
+  $legs[l][:hip]= hip
+  $legs[l][:knee]= knee
+  $legs[l][:ankle]= ankle
+end
+
 def do_rotate_leg(l, dr)
   x, y, z= $legs[l][:pos]
 
@@ -154,44 +167,85 @@ def do_rotate_leg(l, dr)
   $legs[l][:ankle]= ankle
 end
 
-#$liftleg= -1
-#$rcnt= 10
-$step= 0
-$itcnt= 0
-def walk
-  dr= 0.05
-  # dr= 0.5
-  # (0..5).each do |l|
-  #   if l != $liftleg
-  #     do_rotate_leg(l, dr)
-  #   else
-  #     do_rotate_leg(l, -dr*5)
-  #   end
-  # end
-  # $rcnt+=1
-  # if $rcnt > 10
-  #   $legs[$liftleg][:pos][2] -= 20 if($liftleg >= 0)
-  #   $liftleg+=1
-  #   $liftleg= 0 if($liftleg > 5)
-  #   $legs[$liftleg][:pos][2] += 20
-  #   $rcnt= 0
-  # end
+$legup=[].fill(false, 0, 6)
+def legup(l)
+  do_move_leg_by(l, 0, 0, 30)
+  $legup[l]= true
+end
 
- # $legs[$step][:pos][2] += 20
-     (0..5).each do |l| # foreach leg
-      if l != $step
-        do_rotate_leg(l, dr)
-      else
-        do_rotate_leg(l, -dr*10)
-      end
+def legdown(l)
+  do_move_leg_by(l, 0, 0, -30)
+  $legup[l]= false
+end
+
+$first= true
+$liftleg= 0
+$rcnt= 0
+def rotate_walk
+  dr= 0.5
+  if $rcnt == 0
+    legup($liftleg)
+  end
+
+  (0..5).each do |l|
+    if $legup[l]
+      do_rotate_leg(l, -dr*5)
+    else
+      do_rotate_leg(l, dr)
     end
-    $itcnt += 1
-    if $itcnt > 6
-      $step += 1
-      $step= 0 if $step > 5
-      $itcnt= 0
-    end
- # $legs[$step][:pos][2] -= 20
+  end
+
+  $rcnt+=1
+  if $rcnt > 10
+    legdown($liftleg)
+    $liftleg+=1
+    $liftleg= 0 if($liftleg > 5)
+    $rcnt= 0
+  end
+
+end
+
+# tripod gait called @50Hz 1000/TIMER_FREQUENCY_MILLIS
+$lg1= 0
+$lg2= 1
+$cnt= 0
+$legorder= [[0, 2, 4], [1, 3, 5]]
+HZ= 1000.0/TIMER_FREQUENCY_MILLIS
+
+def walk
+  stride= 40.0
+  dr= stride/HZ
+  x= 0
+  y= dr
+
+  if $first
+    ix= x * HZ
+    iy= y * HZ
+    # init legs
+    $legorder[$lg1].each { |l| do_move_leg_by(l, -ix/2, -iy/2, 0) }
+    $legorder[$lg2].each { |l| do_move_leg_by(l, ix/2, iy/2, 0) }
+    $first= false
+  end
+
+  # start of cycle
+  if $cnt == 0
+    # lift legs
+    $legorder[$lg1].each { |l| legup(l) }
+  end
+
+  # for each group of legs
+  $legorder[$lg1].each { |l| do_move_leg_by(l, x, y, 0)   }
+  $legorder[$lg2].each { |l| do_move_leg_by(l, -x, -y, 0) }
+
+  $cnt += 1
+
+  # end of cycle
+  if $cnt >= HZ
+    $legorder[$lg1].each { |l| legdown(l) }
+    $lg1, $lg2 = $lg2, $lg1
+    $cnt= 0
+  end
+
 end
 
 #
@@ -208,7 +262,7 @@ play = lambda do
 end
 
 def drawHexagon
-  ht= 0.1
+  ht= 10
   # Draw 3D hexagon.
   glColor3f(1,0,0)
   glBegin (GL_POLYGON)
@@ -524,6 +578,7 @@ timer = lambda do |value|
 
   if $animate
     walk
+    #rotate_walk
   end
 
   glutTimerFunc(TIMER_FREQUENCY_MILLIS , timer, 0)

@@ -260,13 +260,13 @@ void rotateRippleGait(int reps, float angle, float speed)
 	float x= std::get<0>(legs[0].getPosition());
 	float y= std::get<1>(legs[0].getPosition());
 	float tx, ty, tz;
-    std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // TODO maybe check each leg
-    float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2)); // the distance 1° moves the leg
+   	std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // all legs seem to move the same amount
+	float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2)); // the distance 1° moves the leg
 
 	int iterations= roundf((dist*update_frequency)/speed); // number of iterations
 	float da= rotate_inc/iterations; // delta angle to move each step
 	float ra= angle/iterations; // delta angle to move each iteration for reset
-    printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
+    //printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
 
 	// basically ripple legs around
 	for (int i = 0; i < reps; ++i) {
@@ -316,12 +316,12 @@ void rotateTripodGait(int reps, float angle, float speed)
 	float rad= RADIANS(angle);
 	float x= std::get<0>(legs[0].getPosition());
 	float y= std::get<1>(legs[0].getPosition());
-    std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // TODO maybe check each leg
+    std::tie(tx, ty, std::ignore)= legs[0].calcRotation(rad); // all legs seem to move the same
     float dist= sqrtf(powf(x-tx, 2) + powf(y-ty, 2)); // the distance 1° moves the leg
 
 	int iterations= roundf((dist*update_frequency)/speed); // number of iterations
 	float da= angle/iterations; // delta angle to move each iteration
-	printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
+	//printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
 
 	for (int i = 0; i < reps; ++i) {
 		// first phase
