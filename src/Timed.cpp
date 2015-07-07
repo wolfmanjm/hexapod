@@ -5,12 +5,12 @@
 #include <limits.h>
 #include <sys/sysinfo.h>
 #include <memory.h>
+#include <math.h>
 
 Timed::Timed(float update_frequency)
 {
 	timeInit();
-	this->update_frequency= update_frequency;
-	this->usleep_time= (1000000/update_frequency);
+	this->usleep_time= round(1000000.0/update_frequency);
 }
 
 Timed::~Timed()
@@ -90,16 +90,16 @@ uint32_t Timed::micros( void )
     divisor = (cpufreq );
     diff = tsc_cur - tsc_init;
 
-    return (unsigned long) (diff / divisor);
+    return (uint32_t) (diff / divisor);
 }
 
 void Timed::run(uint32_t iterations, std::function<void(void)> fnc)
 {
 	for (int j = 0; j < iterations; ++j) {
-	    unsigned long t1= micros();
+	    uint32_t t1= micros();
 	    fnc();
-		unsigned long t2= micros();
-		unsigned long t3= (t2>t1)?t2-t1:0;
+		uint32_t t2= micros();
+		uint32_t t3= (t2>t1)?t2-t1:0;
 
 		// adjust for length of time it took above
 		if(usleep_time > t3) {

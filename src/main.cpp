@@ -95,6 +95,7 @@ void interpolatedMoves(std::vector<Pos3> pos, float speed, bool relative = true,
 	int iterations = roundf(1.0F / slice); // number of iterations
 
 	uint32_t s = timed.micros();
+	// execute the lambda iterations times at the specified frequency for timed
 	timed.run(iterations, [moves, slice]() {
 		for(auto &p : moves) {
 			float x, y, z;
@@ -360,7 +361,7 @@ void waveGait(int reps, float stridex, float stridey, float speed)
 	// set legs to initial positions from home positions at start of new gait
 	// should not matter where legs actually are
 	if(reps == -1) {
-std: std::vector<Pos2> v;
+		std::vector<Pos2> v;
 		for (int i = 0; i < 6; ++i) { // for each leg
 			uint8_t l = legorder[i];
 			float x, y, z;
