@@ -56,7 +56,7 @@ void my_subscribe_callback(struct mosquitto *mosq, void *userdata, int mid, int 
 void my_log_callback(struct mosquitto *mosq, void *userdata, int level, const char *str)
 {
 	/* Pring all log messages regardless of level. */
-	printf("MQTT: LOG: %s\n", str);
+	//printf("MQTT: LOG: %s\n", str);
 }
 
 int mqtt_start(const char *host, std::function<bool(const char *)> tcb)

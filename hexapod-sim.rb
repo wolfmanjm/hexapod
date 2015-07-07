@@ -211,19 +211,20 @@ $lg2= 1
 $cnt= 0
 $legorder= [[0, 2, 4], [1, 3, 5]]
 HZ= 1000.0/TIMER_FREQUENCY_MILLIS
-
+$nstridey= 40.0
+$nstridex= 0.0
+$stridey= nil
+$stridex= nil
 def walk
-  stride= 40.0
-  dr= stride/HZ
-  x= 0
-  y= dr
 
   if $first
-    ix= x * HZ
-    iy= y * HZ
+    ix= $nstridex
+    iy= $nstridey
     # init legs
     $legorder[$lg1].each { |l| do_move_leg_by(l, -ix/2, -iy/2, 0) }
     $legorder[$lg2].each { |l| do_move_leg_by(l, ix/2, iy/2, 0) }
+    $stridex= $nstridex
+    $stridey= $nstridey
     $first= false
   end
 
@@ -231,11 +232,24 @@ def walk
   if $cnt == 0
     # lift legs
     $legorder[$lg1].each { |l| legup(l) }
+    if $stridex != $nstridex or $stridey != $nstridey
+      # adjust for new stride. we do this at the start of a new cycle and adjust the legs to new start positions
+      dx= $nstridex - $stridex
+      dy= $nstridey - $stridey
+      $legorder[$lg1].each { |l| do_move_leg_by(l, -dx/2, -dy/2, 0) }
+      $legorder[$lg2].each { |l| do_move_leg_by(l, dx/2, dy/2, 0) }
+    end
+
+    $stridex= $nstridex
+    $stridey= $nstridey
   end
 
+  dx= $stridex/HZ
+  dy= $stridey/HZ
+
   # for each group of legs
-  $legorder[$lg1].each { |l| do_move_leg_by(l, x, y, 0)   }
-  $legorder[$lg2].each { |l| do_move_leg_by(l, -x, -y, 0) }
+  $legorder[$lg1].each { |l| do_move_leg_by(l, dx, dy, 0)   }
+  $legorder[$lg2].each { |l| do_move_leg_by(l, -dx, -dy, 0) }
 
   $cnt += 1
 
@@ -526,9 +540,14 @@ mouse = lambda do |button,state,x,y|
 end
 
 special = lambda do |key,x,y|
-  legx= $legs[$leg][:pos][0]
-  legy= $legs[$leg][:pos][1]
-  legz= $legs[$leg][:pos][2]
+  unless $animate
+    legx= $legs[$leg][:pos][0]
+    legy= $legs[$leg][:pos][1]
+    legz= $legs[$leg][:pos][2]
+  else
+    legx= legy= legz= 0
+  end
+
   case key
   when GLUT_KEY_HOME
     $fXDiff = 0
@@ -538,7 +557,9 @@ special = lambda do |key,x,y|
     $yLastIncr = 0
     $fXInertia = -0.5
     $fYInertia = 0
-    $fScale = 1.0
+    $fScale = 1/100.0
+    $nstridey= 40
+    $nstridex= 0
   when GLUT_KEY_LEFT
     legx -= 1
   when GLUT_KEY_RIGHT
@@ -553,20 +574,23 @@ special = lambda do |key,x,y|
     legz -= 1
   end
 
-  tx, ty= transform($legs[$leg][:rot], legx, legy)
+  unless $animate
+    tx, ty= transform($legs[$leg][:rot], legx, legy)
 
-  hip, knee, ankle =  _inverse_kinematics(tx, ty, legz)
-  $legs[$leg][:hip]= hip
-  $legs[$leg][:knee]= knee
-  $legs[$leg][:ankle]= ankle
+    hip, knee, ankle =  _inverse_kinematics(tx, ty, legz)
+    $legs[$leg][:hip]= hip
+    $legs[$leg][:knee]= knee
+    $legs[$leg][:ankle]= ankle
 
-  $legs[$leg][:pos][0]= legx
-  $legs[$leg][:pos][1]= legy
-  $legs[$leg][:pos][2]= legz
+    $legs[$leg][:pos][0]= legx
+    $legs[$leg][:pos][1]= legy
+    $legs[$leg][:pos][2]= legz
+  else
+    # change stride
+    $nstridex += (legx*5)
+    $nstridey += (legy*5)
+  end
 
-  # FIXME
-  #$mqttcon.publish('quadruped/commands', "A #{$leg} #{$hip} #{$knee} #{$ankle}") if $stream_angle and $mqttcon
-  #$mqttcon.publish('quadruped/commands', "P #{$leg} #{$legx} #{$legy} #{$legz}") if $stream_pos and $mqttcon
 end
 
 timer = lambda do |value|

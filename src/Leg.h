@@ -31,6 +31,7 @@ public:
 	bool moveBy(float dx, float dy, float dz);
 	bool rotateBy(float rad);
 	Vec3 calcRotation(float rad) const;
+	Vec3 getHomeCoordinates();
 
 	bool onGround() const { return on_ground; }
 	bool setOnGround(bool flg) { on_ground= flg; }

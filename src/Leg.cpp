@@ -72,12 +72,19 @@ void  Leg::transform(float m[2][2], float& x, float& y)
     y= ny;
 }
 
+Leg::Vec3 Leg::getHomeCoordinates()
+{
+    float x= COXA+FEMUR, y= 0, z= -TIBIA;
+    transform(home_mat, x, y);
+    return Vec3(x, y, z);
+}
+
 // all servos will be at 90°
 bool Leg::home()
 {
-    float x= COXA+FEMUR, y= 0;
-    transform(home_mat, x, y);
-    return move(x, y, -TIBIA);
+    float x, y, z;
+    std::tie(x, y, z) = getHomeCoordinates();
+    return move(x, y, z);
 }
 
 float Leg::solveTriangle(float a, float b, float c)
