@@ -10,7 +10,7 @@ static std::function<bool(const char *)> cb;
 void my_message_callback(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
 {
 	if(message->payloadlen){
-		printf("MQTT: %s %s\n", message->topic, message->payload);
+		//printf("MQTT: %s %s\n", message->topic, message->payload);
 		bool exit;
 
 		char msg[message->payloadlen+1];
@@ -26,7 +26,7 @@ void my_message_callback(struct mosquitto *mosq, void *userdata, const struct mo
 		}
 
 	}else{
-		printf("MQTT: %s (null)\n", message->topic);
+		//printf("MQTT: %s (null)\n", message->topic);
 	}
 	fflush(stdout);
 }

@@ -42,16 +42,8 @@ while running
   e = k.event
   if e.type == Rjoystick::Event::JSBUTTON
     #puts "Button: #{e.number} #{e.value}"
-
-    case e.number
-    when 1
-      $mqttcon.publish('quadruped/commands', "G 0") if $mqttcon && e.value == 1
-    when 2
-      $mqttcon.publish('quadruped/commands', "G 1") if $mqttcon && e.value == 1
-    when 3
-      $mqttcon.publish('quadruped/commands', "G 2") if $mqttcon && e.value == 1
-    when 7
-      running= false
+    if $mqttcon && e.value == 1
+      $mqttcon.publish('quadruped/commands', "G #{e.number}")
     end
   end
   if e.type == Rjoystick::Event::JSAXIS

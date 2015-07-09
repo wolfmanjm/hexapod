@@ -30,8 +30,8 @@ public:
 	bool move(float x, float y);
 	bool moveBy(float dx, float dy, float dz);
 	bool rotateBy(float rad);
-	Vec3 calcRotation(float rad) const;
-	Vec3 getHomeCoordinates();
+	Vec3 calcRotation(float rad, bool abs= false) const;
+	Vec3 getHomeCoordinates() const;
 
 	bool onGround() const { return on_ground; }
 	bool setOnGround(bool flg) { on_ground= flg; }
@@ -41,7 +41,7 @@ public:
 private:
 	float solveTriangle(float a, float b, float c);
 	float norm(float a, float b){ return sqrtf(a * a + b * b); }
-	void transform(float mat[2][2], float& x, float& y);
+	void transform(const float mat[2][2], float& x, float& y) const;
 
 	Vec3 inverseKinematics(float x, float y, float z);
 

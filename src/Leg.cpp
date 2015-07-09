@@ -64,7 +64,7 @@ Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint
 }
 
 // transform x, y to match leg position
-void  Leg::transform(float m[2][2], float& x, float& y)
+void  Leg::transform(const float m[2][2], float& x, float& y) const
 {
     float nx= x * m[0][0] + y * m[1][0];
     float ny= x * m[0][1] + y * m[1][1];
@@ -72,7 +72,7 @@ void  Leg::transform(float m[2][2], float& x, float& y)
     y= ny;
 }
 
-Leg::Vec3 Leg::getHomeCoordinates()
+Leg::Vec3 Leg::getHomeCoordinates() const
 {
     float x= COXA+FEMUR, y= 0, z= -TIBIA;
     transform(home_mat, x, y);
@@ -158,11 +158,20 @@ bool Leg::moveBy(float dx, float dy, float dz)
                  std::get<2>(position) + dz);
 }
 
-Leg::Vec3 Leg::calcRotation(float rad) const
+Leg::Vec3 Leg::calcRotation(float rad, bool abs) const
 {
     // Rotate the tip of the leg around the center of robot's body.
-    float x = std::get<0>(position) + origin[0];
-    float y = std::get<1>(position) + origin[1];
+    float x, y;
+    if(abs) {
+        // based on home position
+        std::tie(x, y, std::ignore) = getHomeCoordinates();
+
+    }else{
+        // based on current position
+        std::tie(x, y, std::ignore) = position;
+    }
+    x += origin[0];
+    y += origin[1];
     float nx = x *  cosf(rad) + y * sinf(rad);
     float ny = x * -sinf(rad) + y * cosf(rad);
     nx -=  origin[0];

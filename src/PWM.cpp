@@ -1,6 +1,6 @@
 #include "Servo.h"
 
-#ifndef DUMMY
+#ifdef USEGPIO
 #include "PWM.h"
 
 #include <cmath>
