@@ -40,6 +40,7 @@ running= true
 lastv= 0
 while running
   e = k.event
+  continue if e.nil?
   if e.type == Rjoystick::Event::JSBUTTON
     #puts "Button: #{e.number} #{e.value}"
     if $mqttcon && e.value == 1
