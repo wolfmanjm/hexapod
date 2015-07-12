@@ -4,7 +4,7 @@ class MovementGroup < Qt::GroupBox
     slots   'valueChangedX(int)',
             'valueChangedY(int)',
             'valueChangedA(int)',
-            'valueChangedSpeed(int)',
+            'valueChangedStride(int)',
             'valueChangedHeight(int)'
 
 
@@ -22,13 +22,23 @@ class MovementGroup < Qt::GroupBox
         @sliderx.minimum = -100
         @sliderx.maximum = 100
 
-        @slidery = Qt::Slider.new(Qt::Vertical)
+        @slidery = Qt::Slider.new(Qt::Horizontal)
         @slidery.focusPolicy = Qt::StrongFocus
         @slidery.tickPosition = Qt::Slider::TicksBothSides
         @slidery.tickInterval = 10
         @slidery.singleStep = 1
         @slidery.minimum = -100
         @slidery.maximum = 100
+
+        @xvalue = Qt::SpinBox.new do |s|
+            s.range = -100..100
+            s.singleStep = 1
+        end
+
+        @yvalue = Qt::SpinBox.new do |s|
+            s.range = -100..100
+            s.singleStep = 1
+        end
 
         @dial = Qt::Dial.new {
             setFocusPolicy(Qt::StrongFocus)
@@ -40,11 +50,19 @@ class MovementGroup < Qt::GroupBox
             setSingleStep(1)
             setWrapping(false)
         }
+        @avalue = Qt::SpinBox.new do |s|
+            s.range = -100..100
+            s.singleStep = 1
+        end
 
-        ga= ["Wave", "Tripod", "WaveRotate", "TripodRotate"]
-        grb= ga.collect do |n|
-            Qt::RadioButton.new(n) {
-                connect(SIGNAL :clicked) { $me.setGait(n) }
+        @xlabel= Qt::Label.new("X")
+        @ylabel= Qt::Label.new("Y")
+        @alabel= Qt::Label.new("A")
+
+        @ga= {None: 1, Wave: 2, Tripod: 3, TripodRotate: 4, WaveRotate: 5, Home: 7}
+        grb= @ga.collect do |n|
+            Qt::RadioButton.new(n[0].to_s) {
+                connect(SIGNAL :clicked) { $me.setGait(n[1]) }
             }
         end
         grb[0].checked= true
@@ -57,7 +75,7 @@ class MovementGroup < Qt::GroupBox
             setLayout(buttons)
         end
 
-        @speed = Qt::SpinBox.new do
+        @stride = Qt::SpinBox.new do
             setValue(50)
             setMinimum(0)
             setMaximum(100)
@@ -71,29 +89,38 @@ class MovementGroup < Qt::GroupBox
             setSuffix("%")
         end
 
-        @speedset= Qt::FormLayout.new do |l|
-            # l.setRowWrapPolicy(Qt::FormLayout::DontWrapRows)
-            # l.setFieldGrowthPolicy(Qt::FormLayout::FieldsStayAtSizeHint)
-            # l.setFormAlignment(Qt::AlignHCenter | Qt::AlignTop)
-            # l.setLabelAlignment(Qt::AlignLeft)
-            l.addRow(tr("Speed"), @speed)
+        reset_button = Qt::PushButton.new('Reset') do |w|
+            w.connect(SIGNAL :clicked) { @sliderx.value= 0; @slidery.value= 0; @dial.value= 0; }
+        end
+
+        @controls= Qt::GridLayout.new do |l|
+            l.addWidget(@xlabel, 0, 0); l.addWidget(@sliderx, 0, 1); l.addWidget(@xvalue, 0, 2)
+            l.addWidget(@ylabel, 1, 0); l.addWidget(@slidery, 1, 1); l.addWidget(@yvalue, 1, 2)
+            l.addWidget(@alabel, 2, 0); l.addWidget(@dial, 2, 1); l.addWidget(@avalue, 2, 2)
+            l.addWidget(reset_button, 3, 0)
+        end
+
+        @aux= Qt::FormLayout.new do |l|
+            l.addRow(tr("Stride"), @stride)
             l.addRow(tr("Height"), @height)
         end
 
         connect(@sliderx, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedX(int)'))
+        connect(@sliderx, SIGNAL('valueChanged(int)'), @xvalue, SLOT('setValue(int)'))
         connect(@slidery, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedY(int)'))
+        connect(@slidery, SIGNAL('valueChanged(int)'), @yvalue, SLOT('setValue(int)'))
         connect(@dial, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedA(int)'))
-        connect(@speed, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedSpeed(int)'))
+        connect(@dial, SIGNAL('valueChanged(int)'), @avalue, SLOT('setValue(int)'))
+        connect(@stride, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedStride(int)'))
         connect(@height, SIGNAL('valueChanged(int)'), self, SLOT('valueChangedHeight(int)'))
 
-        @slidersLayout = Qt::VBoxLayout.new do |l|
-            l.addWidget(@sliderx)
-            l.addWidget(@slidery)
-            l.addWidget(@dial)
-            l.addLayout(@speedset)
+        layout= Qt::VBoxLayout.new do |l|
+            l.addLayout(@controls)
+            l.addLayout(@aux)
+            l.addStretch(1)
             l.addWidget(gaits)
         end
-        setLayout(@slidersLayout)
+        setLayout(layout)
     end
 
     def setGait(g)
@@ -116,8 +143,8 @@ class MovementGroup < Qt::GroupBox
         @mqttcon.publish('quadruped/commands', "R #{value}") if @mqttcon
     end
 
-    def valueChangedSpeed(value)
-        puts "Speed #{value}"
+    def valueChangedStride(value)
+        puts "Stride #{value}"
         @mqttcon.publish('quadruped/commands', "S #{value}") if @mqttcon
     end
 

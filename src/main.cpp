@@ -532,8 +532,8 @@ bool handle_request(const char *req)
 			break;
 
 		case 'S': // stride
-			x = std::stof(cmd, &p1) + 100; // we now have 0 - 200
-			current_stride = max_stride * x / 200; // take percentage of max stride
+			x = std::stof(cmd, &p1); // we now have 0 - 100
+			current_stride = max_stride * x / 100; // take percentage of max stride
 			//printf("stride set to: %f\n", current_stride.load());
 			break;
 
@@ -550,6 +550,14 @@ bool handle_request(const char *req)
 			}else if(v < 0) {
 				body_height = body_height - 5;
 			}
+			break;
+
+		case 'L': // left or right
+			break;
+
+		case 'H': // up or down -100% to 100%
+			v = std::stoi(cmd, &p1);
+			body_height = TIBIA * (100+v)/100.0;
 			break;
 
 		default: printf("Unknown MQTT command: %c\n", c);
