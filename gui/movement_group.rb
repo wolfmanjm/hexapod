@@ -5,7 +5,8 @@ class MovementGroup < Qt::GroupBox
             'valueChangedY(int)',
             'valueChangedA(int)',
             'valueChangedStride(int)',
-            'valueChangedHeight(int)'
+            'valueChangedHeight(int)',
+            'setServo(int)'
 
 
 
@@ -119,8 +120,56 @@ class MovementGroup < Qt::GroupBox
             l.addLayout(@aux)
             l.addStretch(1)
             l.addWidget(gaits)
+            #l.addWidget(setup_direct_moves)
         end
         setLayout(layout)
+    end
+
+    # panel to set the angle on a specific servo
+    def setup_direct_moves
+        servo_buttons= []
+        18.times do |i|
+           servo_buttons << Qt::CheckBox.new(i.to_s)
+        end
+        direct_moves = Qt::GroupBox.new("Direct Moves") do
+            l= Qt::VBoxLayout.new do
+                r= 0
+                c= 0
+                gl= Qt::GridLayout.new do
+                    servo_buttons.each do |w|
+                        addWidget(w, r, c)
+                        c+=1
+                        if c >= 9
+                            c= 0
+                            r+=1
+                        end
+                    end
+                end
+                addLayout(gl)
+
+                angle= Qt::SpinBox.new do
+                    setValue(90)
+                    setMinimum(0)
+                    setMaximum(200)
+                    setSuffix("°")
+                end
+                addWidget(angle)
+                connect(angle, SIGNAL('valueChanged(int)'), $me, SLOT('setServo(int)'))
+            end
+
+            setLayout(l)
+        end
+
+        @servo_buttons= servo_buttons
+        direct_moves
+    end
+
+    def setServo(a)
+        @servo_buttons.each do |b|
+            if b.isChecked
+                @mqttcon.publish('quadruped/commands', "A #{b.text} #{a}") if @mqttcon
+            end
+        end
     end
 
     def setGait(g)

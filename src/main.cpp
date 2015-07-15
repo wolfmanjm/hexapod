@@ -127,7 +127,7 @@ void safeHome()
 		float x, y, z;
 		std::tie(x, y, z) = legs[l].getHomeCoordinates();
 		legs[l].move(x, y, z+30);
-		usleep(250000);
+		usleep(200000);
 		legs[l].move(x, y, z);
 	}
 }
@@ -426,7 +426,7 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 	}
 }
 
-// being controoled via joystick over MQTT
+// being controlled via joystick or GUI over MQTT
 void joystickControl()
 {
 	GAIT last_gait = NONE;
@@ -523,12 +523,12 @@ bool handle_request(const char *req)
 
 		case 'X':
 			current_x = std::stof(cmd, &p1); // x is the proportional speed in X
-			//printf("x set to: %f\n", current_x.load());
+			printf("x set to: %f\n", current_x.load());
 			break;
 
 		case 'Y':
 			current_y = std::stof(cmd, &p1); // y is the proportional speed in Y
-			//printf("y set to: %f\n", current_y.load());
+			printf("y set to: %f\n", current_y.load());
 			break;
 
 		case 'S': // stride
@@ -560,23 +560,18 @@ bool handle_request(const char *req)
 			body_height = TIBIA * (100+v)/100.0;
 			break;
 
+		case 'A':
+			// set servos to given Angle - parameters: servo angle
+			v = std::stoi(cmd, &p1);
+			x = std::stof(cmd.substr(p1), &p2);
+			servo.updateServo(v, x);
+			break;
+
 		default: printf("Unknown MQTT command: %c\n", c);
 	}
 
 #if 0
-	if(c == 'A') {
-		// set servos to given Angle
-		leg = std::stoi(cmd, &p1);
-		x = std::stof(cmd.substr(p1), &p2);
-		y = std::stof(cmd.substr(p1 + p2), &p3);
-		z = std::stof(cmd.substr(p1 + p2 + p3));
-		printf("request %c: leg: %d, x: %f, y: %f, z: %f\n", c, leg, x, y, z);
-
-		servo.updateServo((leg * 3) + 0, z); // ankle
-		servo.updateServo((leg * 3) + 1, y); // knee
-		servo.updateServo((leg * 3) + 2, x); // hip
-
-	} else if(c == 'P') {
+	if(c == 'P') {
 		// set Position to given XYZ
 		leg = std::stoi(cmd, &p1);
 		x = std::stof(cmd.substr(p1), &p2);

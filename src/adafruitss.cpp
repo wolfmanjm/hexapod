@@ -28,9 +28,8 @@
 /*
 Changes:
   pass in float angle.
-  TODO fix _pwm_frequency to actual frequency set
-  TODO check generated pulse widths
-
+  fix frequency adjustment so 60Hz gets 60Hz
+  use requested frequency for pwm_frequency
 */
 #include "adafruitss.h"
 #include <unistd.h>
@@ -56,22 +55,21 @@ adafruitss::adafruitss(int bus,int i2c_address)
 
     adafruitss::setPWMFreq(60);
 
-
     adafruitss::update();
 }
 
 void adafruitss::setPWMFreq(float freq) {
     int result;
-    freq *= 0.88;  // Correct for overshoot in the frequency setting (see issue #11).
+    float afreq= freq * 0.899683334F;  // Correct for overshoot in the frequency setting (see issue #11). (Tested at 60hz with Logic 4)
     float prescaleval = 25000000;
     prescaleval /= 4096;
-    prescaleval /= freq;
+    prescaleval /= afreq;
     prescaleval -= 1;
-    _pwm_frequency = 60.18; // FInal achieved frequency measured with Logic 8!
+    float pwm_frequency = freq; // Use actual requested frequency gives the correct pulse width
 
-    _duration_1ms = ((4096*_pwm_frequency)/1000);  // This is 1ms duration
+    _duration_1ms = ((4096*pwm_frequency)/1000);  // This is 1ms duration
 
-    uint8_t prescale = floor(prescaleval + 0.5);
+    uint8_t prescale = roundf(prescaleval);
 
 
 
@@ -116,7 +114,7 @@ int adafruitss::update(void)
     return MRAA_SUCCESS;
 }
 
-
+// JM allow float degrees
 void adafruitss::servo(uint8_t port, uint8_t servo_type, float degrees) {
     // Set Servo values
     // Degrees is from 0 to 180
@@ -128,7 +126,8 @@ void adafruitss::servo(uint8_t port, uint8_t servo_type, float degrees) {
     int result;
     int r2;
 
-    if(degrees>180) degrees=180;        // Ensure within bounds
+    // JM allow < 180 for my servos
+    //if(degrees>180) degrees=180;        // Ensure within bounds
     if (degrees<0) degrees=0;
     switch (servo_type) {
       case 0:              // Standard Servo 1ms to 2ms
@@ -145,7 +144,7 @@ void adafruitss::servo(uint8_t port, uint8_t servo_type, float degrees) {
          duration = (_duration_1ms*0.8) + ((_duration_1ms*degrees)/128);
          break;
       case 3:              // Extended Servo 0.9ms to 2.1ms,  - GWS Mini STD BB servo
-         //duration = (_duration_1ms*0.8) + ((_duration_1ms*1.4*degrees)/180); simplified to..
+         //duration = (_duration_1ms*0.9) + ((_duration_1ms*1.4*degrees)/180); simplified to..
          duration = (_duration_1ms*0.9) + ((_duration_1ms*degrees)/120);
          break;
    }

@@ -27,10 +27,12 @@ app = Qt::Application.new(ARGV) do
 
 		show
     end
-
-	exec
 end
 
+app.exec
+
+$mqttcon.disconnect() if $mqttcon
+puts "exiting"
 
 
 

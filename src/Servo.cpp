@@ -14,7 +14,7 @@ const static float PI2 = M_PI_2;
 Servo::Servo()
 {
 #ifndef DUMMY
-	const int freqhz= 60;
+	const int freqhz= 50;
 	servos = new adafruitss(6, 0x40);
 	servos->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	// ss 1.787 90°
@@ -65,12 +65,12 @@ static const int8_t SERVO_REVERSE[Servo::NSERVOS] = {
 #ifndef DUMMY
 static const int8_t SERVO_TRIM[Servo::NSERVOS] = {
 	// ankle, knee, hip
-	 10, 20,   0,    // front left
+	 10, 20,   7,    // front left
 	 20, 20,   0,    // middle left
-	  0,  0, -15,    // back left
-	 20, 20,   0,    // back right
+	  0,  0,   0,    // back left
+	 20, 20,  10,    // back right
 	 20, 30, -10,    // middle right
-	 10, 30,  15     // front right
+	 22, 30,  15     // front right
 };
 #else
 static const int8_t SERVO_TRIM[Servo::NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
@@ -80,6 +80,7 @@ void Servo::updateServo(uint8_t channel, float angle)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
 
+	// Note seems to go to 220° with type 1
 	if(angle < 0 || angle > 180) printf("WARNING: angle is too big for channel %d, %f\n", channel ,angle);
 
 	// check if any change to avoid unecessary I2C traffic

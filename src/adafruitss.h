@@ -109,7 +109,6 @@
     int pca9685_addr;
     mraa_i2c_context m_i2c;
     uint8_t m_rx_tx_buf[MAX_BUFFER_LENGTH];
-    float _pwm_frequency;
     float _duration_1ms;
 };
 

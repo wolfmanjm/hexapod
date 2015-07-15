@@ -5,7 +5,7 @@
 //#define DUMMY 1
 
 #ifndef DUMMY
-#define USEGPIO 1
+//#define USEGPIO 1
 class adafruitss;
 #ifdef USEGPIO
 class PWM;
@@ -42,6 +42,6 @@ private:
 #else
 	DummyServo* servos;
 #endif
-	const uint8_t type= 2;
+	const uint8_t type= 1;
 	float current_angle[NSERVOS];
 };

@@ -103,7 +103,7 @@ def _inverse_kinematics(x, y, z)
   f = _length(x, y) - $coxa
   d = _length(f, z)
   if d > $femur + $tibia
-    raise "d out of range #{d}"
+    puts "d out of range #{d}"
   end
 
   hip = Math.atan2(y, x)
@@ -260,6 +260,36 @@ def walk
     $cnt= 0
   end
 
+end
+
+# change the distance the legs are from the center
+def change_stance(d)
+  $legs.each do |l|
+    x, y, z= l[:pos]
+    # transform into leg coordinates
+    x, y= transform(l[:rot], x, y)
+    x += d # add the delta to the X in leg coordinates
+    l[:hip], l[:knee], l[:ankle] =  _inverse_kinematics(x, y, z)
+
+    # transform back to bot coords
+    x, y= transform(-l[:rot], x, y)
+    l[:pos]= [x, y, z]
+  end
+end
+
+# change the height of the body
+def change_height(d)
+  $legs.each do |l|
+    x, y, z= l[:pos]
+    # transform into leg coordinates
+    x, y= transform(l[:rot], x, y)
+    z += d # add the delta to the  in leg coordinates
+    l[:hip], l[:knee], l[:ankle] =  _inverse_kinematics(x, y, z)
+
+    # transform back to bot coords
+    x, y= transform(-l[:rot], x, y)
+    l[:pos]= [x, y, z]
+  end
 end
 
 #
@@ -438,6 +468,12 @@ keyboard = Proc.new do|key, x, y|
     $stream_angle= false
     $stream_pos= !$stream_pos
     puts "Position streaming #{$stream_pos ? 'enabled' : 'disabled'}"
+
+  when ?D, ?d
+    change_stance(key == ?D ? 1 : -1)
+
+  when ?U, ?u
+    change_height(key == ?U ? 1 : -1)
 
   # when ?R
   #   $stream_pos= false
