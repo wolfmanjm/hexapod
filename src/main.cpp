@@ -69,34 +69,33 @@ std::atomic<float> body_height {TIBIA}; // Body height.
 static float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
 static Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
 
-// Interpolate a list of moves at update rate and issue to servos at the update rate]
-void interpolatedMoves(std::vector<Pos3> pos, float speed, bool relative = true, bool force = false)
+// Interpolate a list of moves within the given time in seconds and issue to servos at the update rate
+void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true, bool force = false)
 {
-	float maxdist = 0;
 	std::vector<Pos3> moves;
 
-	for(auto &l : pos) {
-		int leg;
-		float x, y, z;
-		std::tie(leg, x, y, z) = l;
-		if(!relative) {
+	if(!relative) {
+		// get the delta moves for each leg
+		for(auto &l : pos) {
+			int leg;
+			float x, y, z;
+			std::tie(leg, x, y, z) = l;
 			x -= std::get<0>(legs[leg].getPosition());
 			y -= std::get<1>(legs[leg].getPosition());
 			z -= std::get<2>(legs[leg].getPosition());
 			moves.push_back(Pos3(leg, x, y, z));
 		}
-		// we don't include legs that are off ground in the distance so they can move faster
-		if(legs[leg].onGround() || force) {
-			float dist = sqrtf(powf(x, 2) + powf(y, 2) + powf(z, 2));
-			if(dist > maxdist) maxdist = dist;
-		}
+
+	}else{
+		moves = pos;
 	}
 
-	if(relative) moves = pos;
+	// calculate iterations and the amount to slice each move
+	uint32_t iterations = roundf(time * update_frequency);
+	if(iterations == 0) return;
 
-	float slice = speed / (maxdist * update_frequency); // the slice period based on speed and update frequency
-	int iterations = roundf(1.0F / slice); // number of iterations
-
+	float slice = 1.0F / iterations; // the fraction amount each move makes
+	//printf("time: %f secs, iterations= %lu\n", time, iterations);
 	//uint32_t s = timed.micros();
 	// execute the lambda iterations times at the specified frequency for timed
 	timed.run(iterations, [moves, slice]() {
@@ -138,7 +137,8 @@ void safeHome()
 void raiseLeg(int leg, bool lift = true, int raise = 32, float speed = 60)
 {
 	legs[leg].setOnGround(!lift);
-	interpolatedMoves({Pos3(leg, 0, 0, lift ? raise : -raise)}, speed, true, true);
+	float time= raise / speed;
+	interpolatedMoves({Pos3(leg, 0, 0, lift ? raise : -raise)}, time, true, true);
 }
 
 void raiseLegs(std::vector<int> legn, bool lift = true, int raise = 32, float speed = 60)
@@ -149,7 +149,8 @@ void raiseLegs(std::vector<int> legn, bool lift = true, int raise = 32, float sp
 		v.push_back(Pos3(leg, 0, 0, lift ? raise : -raise));
 	}
 
-	interpolatedMoves(v, speed, true, true);
+	float time= raise / speed;
+	interpolatedMoves(v, time, true, true);
 }
 
 // initialize legs to the specified positions
@@ -256,6 +257,8 @@ void rotateTripodGait(int reps, float angle, float speed, bool init)
 
 	// figure out speed of rotation
 	// calculate the distance moved for the given angle on leg 0
+	// Currently based on the distance a leg will move for the angle anfd using the speed in mm/sec
+	// TODO should really be the speed at which the body turns in degrees/sec
 	float rad = RADIANS(angle);
 	float x, y;
 	std::tie(x, y, std::ignore) = legs[0].getHomeCoordinates();
@@ -323,6 +326,10 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 		last_stridey = stridey;
 	}
 
+	// calculate time this move should take, based on the amoun tthe body will move over the ground
+	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
+	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
+
 	for (int i = 0; i < reps; ++i) {
 		float dx, dy;
 		// need to check if stride has changed since last full step at the start of the step phase
@@ -349,7 +356,7 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 			Pos3(legorder[1][1], -stridex + dx, -stridey + dy, 0),
 			Pos3(legorder[1][2], -stridex + dx, -stridey + dy, 0)
 		},
-		speed, true);
+		time, true);
 		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, false, raise, raise_speed);
 
 		// execute step state 2
@@ -362,7 +369,7 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 			Pos3(legorder[0][1], -stridex, -stridey, 0),
 			Pos3(legorder[0][2], -stridex, -stridey, 0)
 		},
-		speed, true);
+		time, true);
 		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, false, raise, raise_speed);
 	}
 }
@@ -395,6 +402,10 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 		last_stridey = stridey;
 	}
 
+	// calculate time this move should take, based on the amount the body will move over the ground
+	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
+	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
+
 	for (int i = 0; i < reps; ++i) {
 
 		for (int s = 0; s < 6; ++s) { // foreach step
@@ -418,10 +429,6 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 
 				// adjust all the legs
 				for(auto &j : v) {
-					// float nx= std::get<1>(j) - dx/2;
-					// float ny= std::get<2>(j) - dx/2;
-					// std::get<1>(j)= nx;
-					// std::get<2>(j)= ny;
 					std::get<1>(j) -= dx / 2;
 					std::get<2>(j) -= dy / 2;
 				}
@@ -431,7 +438,7 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 
 			// execute actual step
 			raiseLeg(leg, true, raise, raise_speed);
-			interpolatedMoves(v, speed, true);
+			interpolatedMoves(v, time/6, true); // each step should take 1/6 of the time calculated for the total move
 			raiseLeg(leg, false, raise, raise_speed);
 		}
 	}
