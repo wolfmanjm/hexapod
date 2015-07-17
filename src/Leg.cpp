@@ -32,11 +32,12 @@
 #include "Servo.h"
 
 #include <cmath>
+#include <exception>
 
 const static float PI2 = M_PI_2;
 const static float PI4 = M_PI_4;
 
-#define RADIANS(a) (a * M_PI / 180.0F)
+#define RADIANS(a) ((a) * M_PI / 180.0F)
 
 Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint8_t joint3, Servo &servo) : servo(servo)
 {
@@ -80,11 +81,11 @@ Leg::Vec3 Leg::getHomeCoordinates() const
 }
 
 // all servos will be at 90°
-bool Leg::home()
+void Leg::home()
 {
     float x, y, z;
     std::tie(x, y, z) = getHomeCoordinates();
-    return move(x, y, z);
+    move(x, y, z);
 }
 
 float Leg::solveTriangle(float a, float b, float c)
@@ -115,16 +116,12 @@ Leg::Vec3 Leg::inverseKinematics(float x, float y, float z)
     return Vec3(hip, knee, ankle);
 }
 
-bool Leg::move(float x, float y)
+void Leg::move(float x, float y)
 {
-    if(!move(x, y, std::get<2>(position))) {
-        printf("move out of range: %f, %f, %f\n", x, y, std::get<2>(position));
-        return false;
-    }
-    return true;
+    move(x, y, std::get<2>(position));
 }
 
-bool Leg::move(float x, float y, float z)
+void Leg::move(float x, float y, float z)
 {
     // Move the tip of the leg to x, y. Return false when out of range.
     float ankle = NAN;
@@ -139,21 +136,20 @@ bool Leg::move(float x, float y, float z)
 
     std::tie(hip, knee, ankle) = inverseKinematics(x, y, z);
     if(isnan(hip) || isnan(knee) || isnan(ankle)) {
-        printf("move out of range: %f, %f, %f\n", x, y, z);
-        return false;
+        fprintf(stderr, "move out of range: %f, %f, %f, %f, %f, %f\n", x, y, z, hip, knee, ankle);
+        throw std::range_error("move");
     }
 
     //hip -= PI4;
     servo.move(joint[0], ankle);
     servo.move(joint[1], knee);
     servo.move(joint[2], hip);
-    return true;
 }
 
-bool Leg::moveBy(float dx, float dy, float dz)
+void Leg::moveBy(float dx, float dy, float dz)
 {
     // Move the tip of the leg by dx, dy. Return false when out of range.
-    return move( std::get<0>(position) + dx,
+    move( std::get<0>(position) + dx,
                  std::get<1>(position) + dy,
                  std::get<2>(position) + dz);
 }
@@ -161,14 +157,14 @@ bool Leg::moveBy(float dx, float dy, float dz)
 Leg::Vec3 Leg::calcRotation(float rad, bool abs) const
 {
     // Rotate the tip of the leg around the center of robot's body.
-    float x, y;
+    float x, y, z;
     if(abs) {
         // based on home position
-        std::tie(x, y, std::ignore) = getHomeCoordinates();
+        std::tie(x, y, z) = getHomeCoordinates();
 
     }else{
         // based on current position
-        std::tie(x, y, std::ignore) = position;
+        std::tie(x, y, z) = position;
     }
     x += origin[0];
     y += origin[1];
@@ -176,12 +172,12 @@ Leg::Vec3 Leg::calcRotation(float rad, bool abs) const
     float ny = x * -sinf(rad) + y * cosf(rad);
     nx -=  origin[0];
     ny -=  origin[1];
-    return Vec3(nx, ny, std::get<2>(position));
+    return Vec3(nx, ny, z);
 }
 
-bool Leg::rotateBy(float rad)
+void Leg::rotateBy(float rad)
 {
     float x, y, z;
-    std::tie(x, y, z)= calcRotation(rad);
-    return move(x, y, z);
+    std::tie(x, y, z)= calcRotation(rad, false);
+    move(x, y, z);
 }

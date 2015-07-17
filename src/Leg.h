@@ -25,12 +25,12 @@ public:
     // required to use emplace_back for creation
 	Leg(Leg&&) = default;
 
-	bool home();
-	bool move(float x, float y, float z);
-	bool move(float x, float y);
-	bool moveBy(float dx, float dy, float dz);
-	bool rotateBy(float rad);
-	Vec3 calcRotation(float rad, bool abs= false) const;
+	void home();
+	void move(float x, float y, float z);
+	void move(float x, float y);
+	void moveBy(float dx, float dy, float dz);
+	void rotateBy(float rad);
+	Vec3 calcRotation(float rad, bool abs) const;
 	Vec3 getHomeCoordinates() const;
 
 	bool onGround() const { return on_ground; }

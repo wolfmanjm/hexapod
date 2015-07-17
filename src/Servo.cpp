@@ -44,10 +44,12 @@ Servo::Servo()
 Servo::~Servo()
 {
 	delete servos;
+#ifndef DUMMY
 #ifdef USEGPIO
 	delete pwm;
 #else
 	delete servos2;
+#endif
 #endif
 }
 
