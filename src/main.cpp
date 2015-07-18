@@ -366,8 +366,8 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 	// need to check if stride has changed since last full step
 	if(last_stridex != stridex || last_stridey != stridey) {
 		// if so adjust the legs by an appropriate offset on first phase of step
-		dx = (stridex - last_stridex) / 4;
-		dy = (stridey - last_stridey) / 4;
+		dx = (stridex - last_stridex) / 2;
+		dy = (stridey - last_stridey) / 2;
 
 		last_stridex = stridex;
 		last_stridey = stridey;
@@ -425,7 +425,7 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 			float x, y, z;
 			std::tie(x, y, z) = legs[l].getHomeCoordinates();
 			v.push_back(Pos2(l, x - (half_stridex - stridex_inc * i), y - (half_stridey - stridey_inc * i)));
-			std::cout << "init: "; print(v.back());
+			//std::cout << "init: "; print(v.back());
 		}
 
 		initLegs(v, false); // absolute positions
@@ -438,11 +438,13 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
 
 	// need to check if stride has changed since last full step at the start of the step phase
-	float dx= 0, dy= 0;
+	float dx= 0, dy= 0, dxi= 0, dyi= 0;
 	if(last_stridex != stridex || last_stridey != stridey) {
 		// if so adjust the legs to appropriate positions
-		dx = (stridex - last_stridex);
-		dy = (stridey - last_stridey);
+		dx = (stridex - last_stridex)/2;
+		dy = (stridey - last_stridey)/2;
+		dxi= dx/2.5; // stride change/5
+		dyi= dy/2.5;
 		last_stridex = stridex;
 		last_stridey = stridey;
 	}
@@ -454,14 +456,14 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 			std::vector<Pos3> v;
 
 			// reset the current leg
-			v.push_back(Pos3(leg, stridex-dx/2, stridey-dy/2, 0));
+			v.push_back(Pos3(leg, stridex-dx, stridey-dy, 0));
 			// printf("reset l= %d, dx= %f, dy= %f\n", leg, dx/2, dy/2); std::cout << "reset: "; print(v.back());
 
 			// move the other legs backwards
 			for (int j = 0; j < 6; ++j) { // for each leg
 				uint8_t l = legorder[j];
 				if(l != leg){
-					v.push_back(Pos3(l, -stridex_inc-(dx/2 - (dx/5*j)), -stridey_inc-(dy/2 - (dy/5*j)), 0));
+					v.push_back(Pos3(l, -stridex_inc-(dx - (dxi*j)), -stridey_inc-(dy - (dyi*j)), 0));
 					// printf("move l= %d, dx= %f, dy= %f\n", l, (dx/2 - (dx/5*j)), (dy/2 - (dy/5*j))); std::cout << "move: "; print(v.back());
 				}
 			}
@@ -471,7 +473,7 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 			interpolatedMoves(v, time/6, true); // each step should take 1/6 of the time calculated for the total move
 			raiseLeg(leg, false, raise, raise_speed);
 			// only adjust first phase of step
-			dx= dy= 0;
+			dx= dy= dxi= dyi= 0;
 		}
 	}
 }
@@ -777,7 +779,7 @@ int main(int argc, char *argv[])
 	if(do_test) {
 		waveGait(1, x, y, speed, true);
 
-		waveGait(1, x, y+70, speed, false);
+		waveGait(1, x, y+80, speed, false);
 		waveGait(1, x, y, speed, false);
 
 	}else if(do_walk) {
