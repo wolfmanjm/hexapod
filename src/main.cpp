@@ -327,14 +327,12 @@ void rotateTripodGait(int reps, float angle, float speed, bool init)
 }
 
 // tripod gait. setup so it moves the body stride distance after a full step cycle (two phases per step)
-// this means that each leg moves ± stride/4 around its home position
+// this means that each leg moves ± stride/2 around its home position, a full step moves 2xstride
 void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 {
 	static float last_stridex = 0, last_stridey = 0;
 	float half_stridex = stridex / 2; // half stride in mm
 	float half_stridey = stridey / 2; // half stride in mm
-	float quarter_stridex = stridex / 4; // quarter stride in mm
-	float quarter_stridey = stridey / 4; // quarter stride in mm
 	float raise = 25;
 	float raise_speed = 200;
 
@@ -350,9 +348,9 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 				float x, y, z;
 				std::tie(x, y, z) = legs[l].getHomeCoordinates();
 				if(i == 0)
-					v.push_back(Pos2(l, x - quarter_stridex, y - quarter_stridey));
+					v.push_back(Pos2(l, x - half_stridex, y - half_stridey));
 				else
-					v.push_back(Pos2(l, x + quarter_stridex, y + quarter_stridey));
+					v.push_back(Pos2(l, x + half_stridex, y + half_stridey));
 			}
 		}
 		initLegs(v, false); // absolute positions
@@ -377,16 +375,16 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 	}
 
 	for (int i = 0; i < reps; ++i) {
-		// as this is two steps we need to move half the stride each step so the total move is 1 stride
+		// this is two strides we need to move each stride in the calculated time
 		// execute step state 1
 		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, true, raise, raise_speed);
 		interpolatedMoves({
-			Pos3(legorder[0][0],  half_stridex - dx,  half_stridey - dy, 0),
-			Pos3(legorder[0][1],  half_stridex - dx,  half_stridey - dy, 0),
-			Pos3(legorder[0][2],  half_stridex - dx,  half_stridey - dy, 0),
-			Pos3(legorder[1][0], -half_stridex + dx, -half_stridey + dy, 0),
-			Pos3(legorder[1][1], -half_stridex + dx, -half_stridey + dy, 0),
-			Pos3(legorder[1][2], -half_stridex + dx, -half_stridey + dy, 0)
+			Pos3(legorder[0][0],  stridex - dx,  stridey - dy, 0),
+			Pos3(legorder[0][1],  stridex - dx,  stridey - dy, 0),
+			Pos3(legorder[0][2],  stridex - dx,  stridey - dy, 0),
+			Pos3(legorder[1][0], -stridex + dx, -stridey + dy, 0),
+			Pos3(legorder[1][1], -stridex + dx, -stridey + dy, 0),
+			Pos3(legorder[1][2], -stridex + dx, -stridey + dy, 0)
 		},
 		time, true);
 		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, false, raise, raise_speed);
@@ -394,12 +392,12 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 		// execute step state 2
 		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, true, raise, raise_speed);
 		interpolatedMoves({
-			Pos3(legorder[1][0],  half_stridex,  half_stridey, 0),
-			Pos3(legorder[1][1],  half_stridex,  half_stridey, 0),
-			Pos3(legorder[1][2],  half_stridex,  half_stridey, 0),
-			Pos3(legorder[0][0], -half_stridex, -half_stridey, 0),
-			Pos3(legorder[0][1], -half_stridex, -half_stridey, 0),
-			Pos3(legorder[0][2], -half_stridex, -half_stridey, 0)
+			Pos3(legorder[1][0],  stridex,  stridey, 0),
+			Pos3(legorder[1][1],  stridex,  stridey, 0),
+			Pos3(legorder[1][2],  stridex,  stridey, 0),
+			Pos3(legorder[0][0], -stridex, -stridey, 0),
+			Pos3(legorder[0][1], -stridex, -stridey, 0),
+			Pos3(legorder[0][2], -stridex, -stridey, 0)
 		},
 		time, true);
 		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, false, raise, raise_speed);
