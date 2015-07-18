@@ -39,7 +39,7 @@ const static float PI4 = M_PI_4;
 
 #define RADIANS(a) ((a) * M_PI / 180.0F)
 
-Leg::Leg(float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint8_t joint3, Servo &servo) : servo(servo)
+Leg::Leg(const char *name, float pos_angle, float home_angle, uint8_t joint1, uint8_t joint2, uint8_t joint3, Servo &servo) : name(name), servo(servo)
 {
     // which servo
     this->joint[0] = joint1;
@@ -136,7 +136,7 @@ void Leg::move(float x, float y, float z)
 
     std::tie(hip, knee, ankle) = inverseKinematics(x, y, z);
     if(isnan(hip) || isnan(knee) || isnan(ankle)) {
-        fprintf(stderr, "move out of range: %f, %f, %f, %f, %f, %f\n", x, y, z, hip, knee, ankle);
+        fprintf(stderr, "move out of range: %s, %f, %f, %f, %f, %f, %f\n", name.c_str(), x, y, z, hip, knee, ankle);
         throw std::range_error("move");
     }
 

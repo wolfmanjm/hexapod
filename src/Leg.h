@@ -3,6 +3,7 @@
 #include <math.h>
 #include <cstdint>
 #include <tuple>
+#include <string>
 
 class Servo;
 
@@ -17,7 +18,7 @@ class Leg
 public:
 	using Vec3 = std::tuple<float, float, float>;
 
-	Leg(float pos, float home_angle, uint8_t joint0, uint8_t joint1, uint8_t joint2, Servo& servo);
+	Leg(const char *name, float pos, float home_angle, uint8_t joint0, uint8_t joint1, uint8_t joint2, Servo& servo);
 
 	// must not allow copies of this Leg to be used accidently
 	Leg( const Leg& other ) = delete; // non construction-copyable
@@ -34,7 +35,7 @@ public:
 	Vec3 getHomeCoordinates() const;
 
 	bool onGround() const { return on_ground; }
-	bool setOnGround(bool flg) { on_ground= flg; }
+	void setOnGround(bool flg) { on_ground= flg; }
 
 	Vec3 getPosition() const { return position; }
 
@@ -45,6 +46,7 @@ private:
 
 	Vec3 inverseKinematics(float x, float y, float z);
 
+	std::string name;
 	Servo& servo;
 	float mat[2][2];
 	float home_mat[2][2];

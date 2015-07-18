@@ -8,6 +8,7 @@
 #include <functional>
 #include <vector>
 #include <atomic>
+#include <iostream>
 
 #define RADIANS(a) ((a) * M_PI / 180.0F)
 #define DEGREES(r) ((r) * 180.0F / M_PI)
@@ -49,11 +50,12 @@ using Pos2 = std::tuple<int, float, float>;
 static std::vector<Leg> legs;
 static Servo servo;
 
-static bool quit = false;
+bool debug_verbose= false;
+
 float optimal_stride = 30;
-float optimal_angle = 45;
+float optimal_angle = 30;
 float max_stride = 70;
-float max_angle = 80;
+float max_angle = 38;
 float min_stride = 5;
 float max_speed = 200;
 
@@ -68,6 +70,35 @@ std::atomic<float> body_height {TIBIA}; // Body height.
 
 static float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
 static Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
+
+
+// helper function to print a tuple of any size
+template<class Tuple, std::size_t N>
+struct TuplePrinter {
+    static void print(const Tuple& t)
+    {
+        TuplePrinter<Tuple, N-1>::print(t);
+        std::cout << ", " << std::get<N-1>(t);
+    }
+};
+
+template<class Tuple>
+struct TuplePrinter<Tuple, 1>{
+    static void print(const Tuple& t)
+    {
+        std::cout << std::get<0>(t);
+    }
+};
+
+template<class... Args>
+void print(const std::tuple<Args...>& t)
+{
+    std::cout << "(";
+    TuplePrinter<decltype(t), sizeof...(Args)>::print(t);
+    std::cout << ")\n";
+}
+// end helper function
+
 
 // Interpolate a list of moves within the given time in seconds and issue to servos at the update rate
 void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true, bool force = false)
@@ -295,12 +326,15 @@ void rotateTripodGait(int reps, float angle, float speed, bool init)
 	}
 }
 
-// tripod gait. setup so it moves +/-stride/2 around the home position
+// tripod gait. setup so it moves the body stride distance after a full step cycle (two phases per step)
+// this means that each leg moves ± stride/4 around its home position
 void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 {
 	static float last_stridex = 0, last_stridey = 0;
 	float half_stridex = stridex / 2; // half stride in mm
 	float half_stridey = stridey / 2; // half stride in mm
+	float quarter_stridex = stridex / 4; // quarter stride in mm
+	float quarter_stridey = stridey / 4; // quarter stride in mm
 	float raise = 25;
 	float raise_speed = 200;
 
@@ -316,9 +350,9 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 				float x, y, z;
 				std::tie(x, y, z) = legs[l].getHomeCoordinates();
 				if(i == 0)
-					v.push_back(Pos2(l, x - half_stridex, y - half_stridey));
+					v.push_back(Pos2(l, x - quarter_stridex, y - quarter_stridey));
 				else
-					v.push_back(Pos2(l, x + half_stridex, y + half_stridey));
+					v.push_back(Pos2(l, x + quarter_stridex, y + quarter_stridey));
 			}
 		}
 		initLegs(v, false); // absolute positions
@@ -326,35 +360,33 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 		last_stridey = stridey;
 	}
 
-	// calculate time this move should take, based on the amoun tthe body will move over the ground
+	// calculate time this move should take, based on the amount the body will move over the ground
 	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
 	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
 
+	float dx= 0, dy= 0;
+	// need to check if stride has changed since last full step
+	if(last_stridex != stridex || last_stridey != stridey) {
+		// if so adjust the legs by an appropriate offset on first phase of step
+		dx = (stridex - last_stridex) / 4;
+		dy = (stridey - last_stridey) / 4;
+
+		last_stridex = stridex;
+		last_stridey = stridey;
+
+	}
+
 	for (int i = 0; i < reps; ++i) {
-		float dx, dy;
-		// need to check if stride has changed since last full step at the start of the step phase
-		if(last_stridex != stridex || last_stridey != stridey) {
-			// if so adjust the legs by an appropriate offset on first phase of step
-			dx = (stridex - last_stridex) / 2;
-			dy = (stridey - last_stridey) / 2;
-
-			last_stridex = stridex;
-			last_stridey = stridey;
-
-		} else {
-			dx = 0;
-			dy = 0;
-		}
-
+		// as this is two steps we need to move half the stride each step so the total move is 1 stride
 		// execute step state 1
 		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, true, raise, raise_speed);
 		interpolatedMoves({
-			Pos3(legorder[0][0],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[0][1],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[0][2],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[1][0], -stridex + dx, -stridey + dy, 0),
-			Pos3(legorder[1][1], -stridex + dx, -stridey + dy, 0),
-			Pos3(legorder[1][2], -stridex + dx, -stridey + dy, 0)
+			Pos3(legorder[0][0],  half_stridex - dx,  half_stridey - dy, 0),
+			Pos3(legorder[0][1],  half_stridex - dx,  half_stridey - dy, 0),
+			Pos3(legorder[0][2],  half_stridex - dx,  half_stridey - dy, 0),
+			Pos3(legorder[1][0], -half_stridex + dx, -half_stridey + dy, 0),
+			Pos3(legorder[1][1], -half_stridex + dx, -half_stridey + dy, 0),
+			Pos3(legorder[1][2], -half_stridex + dx, -half_stridey + dy, 0)
 		},
 		time, true);
 		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, false, raise, raise_speed);
@@ -362,19 +394,19 @@ void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
 		// execute step state 2
 		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, true, raise, raise_speed);
 		interpolatedMoves({
-			Pos3(legorder[1][0],  stridex,  stridey, 0),
-			Pos3(legorder[1][1],  stridex,  stridey, 0),
-			Pos3(legorder[1][2],  stridex,  stridey, 0),
-			Pos3(legorder[0][0], -stridex, -stridey, 0),
-			Pos3(legorder[0][1], -stridex, -stridey, 0),
-			Pos3(legorder[0][2], -stridex, -stridey, 0)
+			Pos3(legorder[1][0],  half_stridex,  half_stridey, 0),
+			Pos3(legorder[1][1],  half_stridex,  half_stridey, 0),
+			Pos3(legorder[1][2],  half_stridex,  half_stridey, 0),
+			Pos3(legorder[0][0], -half_stridex, -half_stridey, 0),
+			Pos3(legorder[0][1], -half_stridex, -half_stridey, 0),
+			Pos3(legorder[0][2], -half_stridex, -half_stridey, 0)
 		},
 		time, true);
 		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, false, raise, raise_speed);
 	}
 }
 
-// wave gait. setup so it moves +/-stride/2 around the home position
+// wave gait. setup so it moves ±stride/2 around the home position
 void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 {
 	const uint8_t legorder[] {2, 1, 0, 3, 4, 5};
@@ -395,6 +427,7 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 			float x, y, z;
 			std::tie(x, y, z) = legs[l].getHomeCoordinates();
 			v.push_back(Pos2(l, x - (half_stridex - stridex_inc * i), y - (half_stridey - stridey_inc * i)));
+			std::cout << "init: "; print(v.back());
 		}
 
 		initLegs(v, false); // absolute positions
@@ -406,44 +439,46 @@ void waveGait(int reps, float stridex, float stridey, float speed, bool init)
 	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
 	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
 
+	// need to check if stride has changed since last full step at the start of the step phase
+	float dx= 0, dy= 0;
+	if(last_stridex != stridex || last_stridey != stridey) {
+		// if so adjust the legs to appropriate positions
+		dx = (stridex - last_stridex);
+		dy = (stridey - last_stridey);
+		last_stridex = stridex;
+		last_stridey = stridey;
+	}
+
 	for (int i = 0; i < reps; ++i) {
 
 		for (int s = 0; s < 6; ++s) { // foreach step
 			uint8_t leg = legorder[s];
 			std::vector<Pos3> v;
 
-			// reset the leg
-			v.push_back(Pos3(leg, stridex, stridey, 0));
+			// reset the current leg
+			v.push_back(Pos3(leg, stridex-dx/2, stridey-dy/2, 0));
+			// printf("reset l= %d, dx= %f, dy= %f\n", leg, dx/2, dy/2); std::cout << "reset: "; print(v.back());
 
-			// setup for moving other legs backwards
-			for (int l = 0; l < 6; ++l) { // for each leg
-				if(l != leg) v.push_back(Pos3(l, -stridex_inc, -stridey_inc, 0));
-			}
-
-			// need to check if stride has changed since last full step at the start of the step phase
-			if(s == 0 && (last_stridex != stridex || last_stridey != stridey)) {
-				// if so adjust the legs to appropriate positions
-				// just adjust the currently queued movements for each leg
-				float dx = stridex - last_stridex;
-				float dy = stridey - last_stridey;
-
-				// adjust all the legs
-				for(auto &j : v) {
-					std::get<1>(j) -= dx / 2;
-					std::get<2>(j) -= dy / 2;
+			// move the other legs backwards
+			for (int j = 0; j < 6; ++j) { // for each leg
+				uint8_t l = legorder[j];
+				if(l != leg){
+					v.push_back(Pos3(l, -stridex_inc-(dx/2 - (dx/5*j)), -stridey_inc-(dy/2 - (dy/5*j)), 0));
+					// printf("move l= %d, dx= %f, dy= %f\n", l, (dx/2 - (dx/5*j)), (dy/2 - (dy/5*j))); std::cout << "move: "; print(v.back());
 				}
-				last_stridex = stridex;
-				last_stridey = stridey;
 			}
 
 			// execute actual step
 			raiseLeg(leg, true, raise, raise_speed);
 			interpolatedMoves(v, time/6, true); // each step should take 1/6 of the time calculated for the total move
 			raiseLeg(leg, false, raise, raise_speed);
+			// only adjust first phase of step
+			dx= dy= 0;
 		}
 	}
 }
 
+#pragma GCC diagnostic ignored "-Wswitch"
 // being controlled via joystick or GUI over MQTT
 void joystickControl()
 {
@@ -459,14 +494,18 @@ void joystickControl()
 		last_gait= gait;
 
 		if(gait != NONE && gait <  WAVE_ROTATE && (std::abs(current_x) > 0.0001F || std::abs(current_y) > 0.0001F))  {
-			// calculate the vector of movement, then set the speed based on that
+			// current_x and current_y are speed percentage in that direction
+			// calculate the vector of movement in percentage
 			float d = sqrtf(powf(current_x, 2) + powf(current_y, 2)); // vector size
-			float x = current_stride * current_x / d; // normalize for proportion move in X
-			float y = current_stride * current_y / d; // normalize for proportion move in Y
-			float speed = max_speed * (d / 100.0F);
-			//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
-			if(speed < 30) speed = 30;
 
+			float x = current_stride * current_x / d; // normalize for proportion move in X, this is stride in mm in X
+			float y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
+
+			float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
+			if(speed < 30) speed = 30;
+			printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
+
+			// execute one entire step which will move body over the ground by current_stride mm
 			switch(gait) {
 				case WAVE:
 				  	waveGait(1, x, y, speed, gait_changed);
@@ -517,8 +556,8 @@ extern int mqtt_start(const char *, std::function<bool(const char *)>);
 bool handle_request(const char *req)
 {
 	int v;
-	float x, y, z;
-	size_t p1, p2, p3;
+	float x;
+	size_t p1, p2;
 
 	std::string cmd(req);
 	char c = cmd.front();
@@ -539,12 +578,12 @@ bool handle_request(const char *req)
 			break;
 
 		case 'X':
-			current_x = std::stof(cmd, &p1); // x is the proportional speed in X
+			current_x = std::stof(cmd, &p1); // x is the proportional speed in X 0 - 100
 			printf("x set to: %f\n", current_x.load());
 			break;
 
 		case 'Y':
-			current_y = std::stof(cmd, &p1); // y is the proportional speed in Y
+			current_y = std::stof(cmd, &p1); // y is the proportional speed in Y 0 - 100
 			printf("y set to: %f\n", current_y.load());
 			break;
 
@@ -552,13 +591,13 @@ bool handle_request(const char *req)
 			x = std::stof(cmd, &p1); // we now have 0 - 100
 			current_stride = max_stride * x / 100; // take percentage of max stride
 			current_angle = max_angle * x / 100; // take percentage of max angle
-			//printf("stride set to: %f\n", current_stride.load());
+			printf("stride set to: %f%% - %f, angle set to: %f\n", x, current_stride.load(), current_angle.load());
 			break;
 
 		case 'R': // Rotate using current gait if using a rotate gait
 			x = std::stof(cmd, &p1); // rotation -100 to 100
 			current_rotate= x;
-			//printf("set rotate to: %f\n", current_rotate.load());
+			printf("set rotate to: %f\n", current_rotate.load());
 			break;
 
 		case 'U': // up or down
@@ -628,17 +667,18 @@ int main(int argc, char *argv[])
 	bool absol = false;
 	bool do_walk = false;
 	uint8_t gait = 0;
+	bool do_test= false;
 
 	// setup an array of legs, using this as they are not copyable.
 	//  position angle, home angle, ankle, knee, hip
-	legs.emplace_back(   60,  -60,  0,  1,  2, servo); // front left
-	legs.emplace_back(    0,    0,  3,  4,  5, servo); // middle left
-	legs.emplace_back(  -60,   60,  6,  7,  8, servo); // back left
-	legs.emplace_back( -120,  120,  9, 10, 11, servo); // back right
-	legs.emplace_back(  180,  180, 12, 13, 14, servo); // middle right
-	legs.emplace_back(  120, -120, 15, 16, 17, servo); // front right
+	legs.emplace_back("front left",    60,  -60,  0,  1,  2, servo); // front left
+	legs.emplace_back("middle left",    0,    0,  3,  4,  5, servo); // middle left
+	legs.emplace_back("back left",    -60,   60,  6,  7,  8, servo); // back left
+	legs.emplace_back("back right",  -120,  120,  9, 10, 11, servo); // back right
+	legs.emplace_back("middle right", 180,  180, 12, 13, 14, servo); // middle right
+	legs.emplace_back("front right",  120, -120, 15, 16, 17, servo); // front right
 
-	while ((c = getopt (argc, argv, "hH:RDamc:l:j:f:x:y:z:s:S:TIL:W:JP:")) != -1) {
+	while ((c = getopt (argc, argv, "hH:RDamc:l:j:f:x:y:z:s:S:TIL:W:JP:v")) != -1) {
 		switch (c) {
 			case 'h':
 				printf("Usage:\n -m home\n");
@@ -659,9 +699,12 @@ int main(int argc, char *argv[])
 				printf(" -W n walk with stride set by -y, speed set by -s, using gait n where 0: wave, 1: tripod, 2: rotate Wave, 3: rotate tripod\n");
 				printf(" -J joystick control over MQTT\n");
 				printf(" -P m pause m milliseconds\n");
+				printf(" -T run test\n");
+				printf(" -v verbose debug\n");
 				return 1;
 
 			case 'H': mqtt_start(optarg, handle_request); break;
+			case 'v': debug_verbose= true;  break;
 
 			case 'D': printf("Hit any key...\n"); getchar(); return 0;
 			case 'J': joystickControl(); return 0;
@@ -705,16 +748,14 @@ int main(int argc, char *argv[])
 				break;
 
 			case 'T':
-				//           leg, x, y
-				initLegs({Pos2(0, x, y), Pos2(5, x, y)}, !abs);
-				//testConcurrentQueue();
+				do_test= true;
 				break;
 
 			case 'I':
 				//interpolatedMoves({Pos3(leg, x, y, z)}, speed, !abs);
 				for (int i = 0; i <= reps; ++i) {
-					interpolatedMoves({Pos3(0, x, y, z), Pos3(1, x, y, z), Pos3(2, x, y, z), Pos3(3, x, y, z), Pos3(4, x, y, z), Pos3(5, x, y, z)}, speed, !abs);
-					interpolatedMoves({Pos3(0, -x, -y, -z), Pos3(1, -x, -y, -z), Pos3(2, -x, -y, -z), Pos3(3, -x, -y, -z), Pos3(4, -x, -y, -z), Pos3(5, -x, -y, -z)}, speed, !abs);
+					interpolatedMoves({Pos3(0, x, y, z), Pos3(1, x, y, z), Pos3(2, x, y, z), Pos3(3, x, y, z), Pos3(4, x, y, z), Pos3(5, x, y, z)}, speed, !absol);
+					interpolatedMoves({Pos3(0, -x, -y, -z), Pos3(1, -x, -y, -z), Pos3(2, -x, -y, -z), Pos3(3, -x, -y, -z), Pos3(4, -x, -y, -z), Pos3(5, -x, -y, -z)}, speed, !absol);
 				}
 				break;
 
@@ -735,7 +776,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(do_walk) {
+	if(do_test) {
+		waveGait(1, x, y, speed, true);
+
+		waveGait(1, x, y+70, speed, false);
+		waveGait(1, x, y, speed, false);
+
+	}else if(do_walk) {
 		switch(gait) {
 			case 0: waveGait(reps, x, y, speed, true); break;
 			case 1: tripodGait(reps, x, y, speed, true); break;

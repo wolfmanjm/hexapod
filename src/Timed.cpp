@@ -95,7 +95,7 @@ uint32_t Timed::micros( void )
 
 void Timed::run(uint32_t iterations, std::function<void(void)> fnc)
 {
-	for (int j = 0; j < iterations; ++j) {
+	for (uint32_t j = 0; j < iterations; ++j) {
 	    uint32_t t1= micros();
 	    fnc();
 		uint32_t t2= micros();

@@ -4,7 +4,6 @@
 
 #include <mosquitto.h>
 
-static struct mosquitto *mosq = NULL;
 static std::function<bool(const char *)> cb;
 
 void my_message_callback(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
@@ -33,7 +32,6 @@ void my_message_callback(struct mosquitto *mosq, void *userdata, const struct mo
 
 void my_connect_callback(struct mosquitto *mosq, void *userdata, int result)
 {
-	int i;
 	if(!result){
 		/* Subscribe to broker information topics on successful connect. */
 		mosquitto_subscribe(mosq, NULL, "quadruped/commands", 2);
@@ -62,7 +60,6 @@ void my_log_callback(struct mosquitto *mosq, void *userdata, int level, const ch
 int mqtt_start(const char *host, std::function<bool(const char *)> tcb)
 {
 	char id[64];
-	int i;
 	int port = 1883;
 	int keepalive = 60;
 	bool clean_session = true;

@@ -34,11 +34,13 @@ class MovementGroup < Qt::GroupBox
         @xvalue = Qt::SpinBox.new do |s|
             s.range = -100..100
             s.singleStep = 1
+            s.setSuffix("%")
         end
 
         @yvalue = Qt::SpinBox.new do |s|
             s.range = -100..100
             s.singleStep = 1
+            s.setSuffix("%")
         end
 
         @dial = Qt::Dial.new {
@@ -54,6 +56,7 @@ class MovementGroup < Qt::GroupBox
         @avalue = Qt::SpinBox.new do |s|
             s.range = -100..100
             s.singleStep = 1
+            s.setSuffix("%")
         end
 
         @xlabel= Qt::Label.new("X")
@@ -91,7 +94,7 @@ class MovementGroup < Qt::GroupBox
         end
 
         reset_button = Qt::PushButton.new('Reset') do |w|
-            w.connect(SIGNAL :clicked) { @sliderx.value= 0; @slidery.value= 0; @dial.value= 0; }
+            w.connect(SIGNAL :clicked) { @sliderx.value= 0; @slidery.value= 0; @dial.value= 0; @stride.value= 50; @height.value= 0; }
         end
 
         @controls= Qt::GridLayout.new do |l|

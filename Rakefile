@@ -109,7 +109,8 @@ DEFINES= defines.join(' ')
 
 DEPFLAGS = '-MMD '
 CSTD = '-std=c99'
-CFLAGS = DEPFLAGS +
+WARNINGS = " -Wall -Wextra -Wno-unused-parameter -Wcast-align -Wpointer-arith -Wredundant-decls -Wcast-qual -Wcast-align "
+CFLAGS = DEPFLAGS + WARNINGS +
     " -m32 -march=core2 -mtune=core2 -msse3 -mfpmath=sse -mstackrealign -fno-omit-frame-pointer " +
     " --sysroot=#{ROOTDIR}/sysroots/core2-32-poky-linux " +
     " -pipe -g -feliminate-unused-debug-types " + (DEBUG ? "-O0 " : "-O2 ")

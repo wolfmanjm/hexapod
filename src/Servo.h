@@ -12,12 +12,12 @@ class PWM;
 #endif
 
 #else
-
+extern bool debug_verbose;
 #include <stdio.h>
 class DummyServo
 {
 public:
-	void servo(uint8_t channel, uint8_t type, float a) { printf("channel: %d, angle: %f\n", channel, a); }
+	void servo(uint8_t channel, uint8_t type, float a) { if(debug_verbose) printf("channel: %d, angle: %f\n", channel, a); }
 };
 
 #endif
