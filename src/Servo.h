@@ -2,11 +2,15 @@
 
 #include <cstdint>
 
-#define DUMMY 1
+//#define DUMMY 1
 
 #ifndef DUMMY
 //#define USEGPIO 1
 class adafruitss;
+namespace mraa {
+	class Gpio;
+};
+
 #ifdef USEGPIO
 class PWM;
 #endif

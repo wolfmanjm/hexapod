@@ -503,7 +503,7 @@ void joystickControl()
 
 			float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
 			if(speed < 30) speed = 30;
-			printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
+			//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
 
 			// execute one entire step which will move body over the ground by current_stride mm
 			switch(gait) {
@@ -608,6 +608,7 @@ bool handle_request(const char *req)
 			}else if(v < 0) {
 				body_height = body_height - 5;
 			}
+			printf("Set body height to %f\n", body_height.load());
 			break;
 
 		case 'L': // left or right
@@ -616,6 +617,7 @@ bool handle_request(const char *req)
 		case 'H': // up or down -100% to 100%
 			v = std::stoi(cmd, &p1);
 			body_height = TIBIA * (100+v)/100.0;
+			printf("Set body height to %f\n", body_height.load());
 			break;
 
 		case 'A':
@@ -623,12 +625,14 @@ bool handle_request(const char *req)
 			v = std::stoi(cmd, &p1);
 			x = std::stof(cmd.substr(p1), &p2);
 			servo.updateServo(v, x);
+			printf("Set Servo %d to %f°\n", v, x);
 			break;
 
 		case 'E':
 			// enable or disable servos
 			v = std::stoi(cmd, &p1);
 			servo.enableServos(v == 1);
+			printf("Servos %s\n", v==1 ? "Enabled" : "Disabled");
 			break;
 
 		default: printf("Unknown MQTT command: %c\n", c);

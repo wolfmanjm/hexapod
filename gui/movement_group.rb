@@ -128,7 +128,7 @@ class MovementGroup < Qt::GroupBox
             l.addLayout(@aux)
             l.addStretch(1)
             l.addWidget(gaits)
-            #l.addWidget(setup_direct_moves)
+            l.addWidget(setup_direct_moves)
         end
         setLayout(layout)
     end

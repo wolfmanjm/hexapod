@@ -15,7 +15,7 @@ const static float PI2 = M_PI_2;
 Servo::Servo()
 {
 #ifndef DUMMY
-	const int freqhz= 50;
+	const int freqhz= 60;
 	servos = new adafruitss(6, 0x40);
 	servos->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	// ss 1.787 90°
@@ -35,7 +35,7 @@ Servo::Servo()
 	#endif
 
 	// start with PWM disabled
-	enable_pin= new mraa::Gpio(20)); // GP12 GPIO-12 J18-7
+	enable_pin= new mraa::Gpio(20); // GP12 GPIO-12 J18-7
 	enable_pin->dir(mraa::DIR_OUT);
 	enableServos(false);
 
@@ -111,7 +111,7 @@ void Servo::updateServo(uint8_t channel, float angle)
 		pwm->setAngle(channel-16, angle);
 	}
 #else
-	if(channel >= 0 && channel <= 8) {
+	if(channel <= 8) {
 		servos->servo(channel, type, angle);
 	}else{
 		servos2->servo(channel-9, type, angle);
@@ -146,7 +146,7 @@ void Servo::enableServos(bool on)
 {
 	if(enabled != on) {
 		#ifndef DUMMY
- 		enable_pin->write(on?1:0);
+ 		enable_pin->write(on?0:1);
 		#endif
 		enabled= on;
 	}

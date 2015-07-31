@@ -17,7 +17,7 @@ app = Qt::Application.new(ARGV) do
         movement.mqttcon= $mqttcon
 
         button = Qt::PushButton.new('Quit') do
-            connect(SIGNAL :clicked) { Qt::Application.instance.quit }
+            connect(SIGNAL :clicked) { puts "quit"; Qt::Application.instance.quit }
         end
 
         self.layout = Qt::VBoxLayout.new do
