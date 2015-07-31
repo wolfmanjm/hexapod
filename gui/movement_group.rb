@@ -97,11 +97,16 @@ class MovementGroup < Qt::GroupBox
             w.connect(SIGNAL :clicked) { @sliderx.value= 0; @slidery.value= 0; @dial.value= 0; @stride.value= 50; @height.value= 0; }
         end
 
+        disable_button = Qt::PushButton.new('Disable') do |w|
+            w.connect(SIGNAL :clicked) { disable_servos(true) }
+        end
+
         @controls= Qt::GridLayout.new do |l|
             l.addWidget(@xlabel, 0, 0); l.addWidget(@sliderx, 0, 1); l.addWidget(@xvalue, 0, 2)
             l.addWidget(@ylabel, 1, 0); l.addWidget(@slidery, 1, 1); l.addWidget(@yvalue, 1, 2)
             l.addWidget(@alabel, 2, 0); l.addWidget(@dial, 2, 1); l.addWidget(@avalue, 2, 2)
             l.addWidget(reset_button, 3, 0)
+            l.addWidget(disable_button, 3, 2)
         end
 
         @aux= Qt::FormLayout.new do |l|
@@ -165,6 +170,10 @@ class MovementGroup < Qt::GroupBox
 
         @servo_buttons= servo_buttons
         direct_moves
+    end
+
+    def disable_servos(b)
+        @mqttcon.publish('quadruped/commands', "E #{b ? 0 : 1}") if @mqttcon
     end
 
     def setServo(a)

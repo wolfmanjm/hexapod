@@ -572,8 +572,9 @@ bool handle_request(const char *req)
 				case 3: gait = TRIPOD; break;
 				case 4: gait = TRIPOD_ROTATE; break;
 				case 5: gait = WAVE_ROTATE; break;
+				case 6: servo.enableServos(false); break;
 				case 7: gait = NONE; safeHome(); break;
-				default: printf("Unknown gait: %d\n", v);
+				default: printf("Unknown button: %d\n", v);
 			}
 			break;
 
@@ -622,6 +623,12 @@ bool handle_request(const char *req)
 			v = std::stoi(cmd, &p1);
 			x = std::stof(cmd.substr(p1), &p2);
 			servo.updateServo(v, x);
+			break;
+
+		case 'E':
+			// enable or disable servos
+			v = std::stoi(cmd, &p1);
+			servo.enableServos(v == 1);
 			break;
 
 		default: printf("Unknown MQTT command: %c\n", c);
@@ -678,7 +685,7 @@ int main(int argc, char *argv[])
 	legs.emplace_back("middle right", 180,  180, 12, 13, 14, servo); // middle right
 	legs.emplace_back("front right",  120, -120, 15, 16, 17, servo); // front right
 
-	while ((c = getopt (argc, argv, "hH:RDamc:l:j:f:x:y:z:s:S:TIL:W:JP:v")) != -1) {
+	while ((c = getopt (argc, argv, "hH:RDamc:l:j:f:x:y:z:s:S:TIL:W:JP:vE:")) != -1) {
 		switch (c) {
 			case 'h':
 				printf("Usage:\n -m home\n");
@@ -699,6 +706,7 @@ int main(int argc, char *argv[])
 				printf(" -W n walk with stride set by -y, speed set by -s, using gait n where 0: wave, 1: tripod, 2: rotate Wave, 3: rotate tripod\n");
 				printf(" -J joystick control over MQTT\n");
 				printf(" -P m pause m milliseconds\n");
+				printf(" -E n enable or disable servos\n");
 				printf(" -T run test\n");
 				printf(" -v verbose debug\n");
 				return 1;
@@ -711,6 +719,7 @@ int main(int argc, char *argv[])
 
 			case 'S': servo.updateServo(atoi(optarg), x); break;
 			case 'P': usleep(atoi(optarg) * 1000); break;
+			case 'E': servo.enableServos(atoi(optarg) == 1); break;
 
 			case 'f': update_frequency = atof(optarg); break;
 

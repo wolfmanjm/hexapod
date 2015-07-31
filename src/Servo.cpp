@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #ifndef DUMMY
+#include "mraa.hpp"
 #include "adafruitss.h"
 #include "PWM.h"
 #endif
@@ -33,6 +34,11 @@ Servo::Servo()
 	servos2->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	#endif
 
+	// start with PWM disabled
+	enable_pin= new mraa::Gpio(20)); // GP12 GPIO-12 J18-7
+	enable_pin->dir(mraa::DIR_OUT);
+	enableServos(false);
+
 #else
 	servos = new DummyServo();
 #endif
@@ -43,8 +49,12 @@ Servo::Servo()
 
 Servo::~Servo()
 {
+	enableServos(false);
 	delete servos;
+
 #ifndef DUMMY
+	delete enable_pin;
+
 #ifdef USEGPIO
 	delete pwm;
 #else
@@ -81,6 +91,8 @@ static const int8_t SERVO_TRIM[Servo::NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
 void Servo::updateServo(uint8_t channel, float angle)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
+
+	if(!enabled) enableServos(true);
 
 	// Note seems to go to 220° with type 1
 	if(angle < 0 || angle > 180) printf("WARNING: angle is too big for channel %d, %f\n", channel ,angle);
@@ -128,4 +140,14 @@ void Servo::move(uint8_t channel, float rads)
 
 	//printf("rads %f, angle %f\n", rads, angle);
 	updateServo(channel, angle);
+}
+
+void Servo::enableServos(bool on)
+{
+	if(enabled != on) {
+		#ifndef DUMMY
+ 		enable_pin->write(on?1:0);
+		#endif
+		enabled= on;
+	}
 }

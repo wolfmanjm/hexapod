@@ -29,6 +29,8 @@ public:
 	~Servo();
 	void move(uint8_t port, float rads);
 	void updateServo(uint8_t channel, float angle);
+	void enableServos(bool on);
+
 	const static uint8_t NSERVOS= 18;
 
 private:
@@ -39,9 +41,11 @@ private:
 	#else
 	adafruitss* servos2;
 	#endif
+	mraa::Gpio* enable_pin;
 #else
 	DummyServo* servos;
 #endif
 	const uint8_t type= 1;
 	float current_angle[NSERVOS];
+	bool enabled;
 };
