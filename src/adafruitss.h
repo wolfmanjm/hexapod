@@ -103,6 +103,7 @@
      * @param degrees angle to set the servo to
      */
     void servo(uint8_t port, uint8_t servo_type, float degrees);
+    void servo(uint8_t port, uint8_t servo_type, int degrees) { servo(port, servo_type, (float)degrees); }
 
   private:
 

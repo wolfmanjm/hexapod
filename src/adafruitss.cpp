@@ -39,19 +39,16 @@ Changes:
 
 adafruitss::adafruitss(int bus,int i2c_address)
 {
-    int n;
-    int result;
-
     mraa_init();
 
 
     m_i2c = mraa_i2c_init(bus);
 
     pca9685_addr =  i2c_address;
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_address(m_i2c, pca9685_addr);
     m_rx_tx_buf[0]=PCA9685_MODE1;
     m_rx_tx_buf[1]=0;
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
 
     adafruitss::setPWMFreq(60);
 
@@ -59,7 +56,6 @@ adafruitss::adafruitss(int bus,int i2c_address)
 }
 
 void adafruitss::setPWMFreq(float freq) {
-    int result;
     float afreq= freq * 0.899683334F;  // Correct for overshoot in the frequency setting (see issue #11). (Tested at 60hz with Logic 4)
     float prescaleval = 25000000;
     prescaleval /= 4096;
@@ -73,40 +69,39 @@ void adafruitss::setPWMFreq(float freq) {
 
 
 
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
-    uint8_t oldmode=0;
-    oldmode = mraa_i2c_read_byte_data(m_i2c,PCA9685_MODE1);
+    mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_read_byte_data(m_i2c,PCA9685_MODE1);
 
 
     m_rx_tx_buf[0]=PCA9685_MODE1;
     m_rx_tx_buf[1]=0x10; // sleep
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
+    mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
 
 
 
     m_rx_tx_buf[0]=PCA9685_PRESCALE;
     m_rx_tx_buf[1]=prescale;
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
+    mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
 
 
 
 
     m_rx_tx_buf[0]=PCA9685_MODE1;
     m_rx_tx_buf[1]=0x00;
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
+    mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
 
-    // result=mraa_i2c_write_byte_data(m_i2c,0x00,PCA9685_MODE1);
+    // mraa_i2c_write_byte_data(m_i2c,0x00,PCA9685_MODE1);
 
     usleep(5000);
 
 
     m_rx_tx_buf[0]=PCA9685_MODE1;
     m_rx_tx_buf[1]=0xa1;
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
+    mraa_i2c_address(m_i2c, pca9685_addr);
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,2);
 }
 
 int adafruitss::update(void)
@@ -123,13 +118,12 @@ void adafruitss::servo(uint8_t port, uint8_t servo_type, float degrees) {
     //             2 = extended 0.8ms to 2.2ms
 
     float duration;
-    int result;
-    int r2;
 
     // JM allow < 180 for my servos
     //if(degrees>180) degrees=180;        // Ensure within bounds
     if (degrees<0) degrees=0;
     switch (servo_type) {
+      default:
       case 0:              // Standard Servo 1ms to 2ms
          duration = _duration_1ms + ((_duration_1ms*degrees)/180);
          break;
@@ -149,15 +143,14 @@ void adafruitss::servo(uint8_t port, uint8_t servo_type, float degrees) {
          break;
    }
 
-   uint16_t d= roundf(duration);
-    result=mraa_i2c_address(m_i2c, pca9685_addr);
+    uint16_t d= roundf(duration);
+    mraa_i2c_address(m_i2c, pca9685_addr);
     m_rx_tx_buf[0]=LED0_REG+4*port;
     m_rx_tx_buf[1]=0;
     m_rx_tx_buf[2]=0;
     m_rx_tx_buf[3]=d;
     m_rx_tx_buf[4]=d>>8;
 
-    result=mraa_i2c_write(m_i2c,m_rx_tx_buf,5);
-    r2=result;
-}
+    mraa_i2c_write(m_i2c,m_rx_tx_buf,5);
+ }
 #endif
