@@ -66,7 +66,7 @@ bool debug_verbose = false;
 
 static Servo servo;
 static float optimal_stride = 30;
-static float optimal_angle = 20;
+static float optimal_angle = 10;
 static float max_stride = 70;
 static float max_angle = 38;
 static float min_stride = 5;
@@ -294,7 +294,7 @@ void joystickControl()
 				float y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
 
 				float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
-				if(speed < 30) speed = 30;
+				if(speed < 20) speed = 20;
 				//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
 
 				// execute one entire step which will move body over the ground by current_stride mm
@@ -310,7 +310,7 @@ void joystickControl()
 
 			} else if(gait >= WAVE_ROTATE && std::abs(current_rotate) > 0.001F) {
 				float speed = max_speed * std::abs(current_rotate) / 100.0F ;
-				if(speed < 20) speed = 20;
+				if(speed < 10) speed = 10;
 				float a = current_angle;
 				if(current_rotate < 0) a = -a; // direction of rotate
 

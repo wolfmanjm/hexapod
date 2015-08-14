@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#define DUMMY 1
+//#define DUMMY 1
 
 extern bool debug_verbose;
 
