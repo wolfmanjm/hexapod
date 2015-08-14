@@ -94,8 +94,10 @@ void Servo::updateServo(uint8_t channel, float angle)
 
 	if(!enabled) enableServos(true);
 
-	// Note seems to go to 220° with type 1
-	if(angle < 0 || angle > 180) printf("WARNING: angle is too big for channel %d, %f\n", channel ,angle);
+	if(debug_verbose) {
+		// Note seems to go to 220° with type 1
+		if(angle < 0 || angle > 180) printf("WARNING: angle is too big for channel %d, %f\n", channel ,angle);
+	}
 
 	// check if any change to avoid unecessary I2C traffic
 	if(angle == current_angle[channel]) return;
@@ -144,10 +146,8 @@ void Servo::move(uint8_t channel, float rads)
 
 void Servo::enableServos(bool on)
 {
-	if(enabled != on) {
-		#ifndef DUMMY
- 		enable_pin->write(on?0:1);
-		#endif
-		enabled= on;
-	}
+#ifndef DUMMY
+	enable_pin->write(on?0:1);
+#endif
+	enabled= on;
 }

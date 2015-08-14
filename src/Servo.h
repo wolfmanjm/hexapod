@@ -2,7 +2,9 @@
 
 #include <cstdint>
 
-//#define DUMMY 1
+#define DUMMY 1
+
+extern bool debug_verbose;
 
 #ifndef DUMMY
 //#define USEGPIO 1
@@ -16,7 +18,6 @@ class PWM;
 #endif
 
 #else
-extern bool debug_verbose;
 #include <stdio.h>
 class DummyServo
 {
@@ -34,6 +35,7 @@ public:
 	void move(uint8_t port, float rads);
 	void updateServo(uint8_t channel, float angle);
 	void enableServos(bool on);
+	bool isEnabled() const { return enabled; }
 
 	const static uint8_t NSERVOS= 18;
 

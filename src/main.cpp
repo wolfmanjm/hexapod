@@ -1,6 +1,7 @@
 #include "Servo.h"
 #include "Leg.h"
 #include "Timed.h"
+#include "helpers.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -9,10 +10,17 @@
 #include <vector>
 #include <atomic>
 #include <iostream>
+#include <csignal>
 
 #define RADIANS(a) ((a) * M_PI / 180.0F)
 #define DEGREES(r) ((r) * 180.0F / M_PI)
 
+// defined in gaits.cpp
+extern void rotateWaveGait(int reps, float angle, float speed, bool init);
+extern void rotateTripodGait(int reps, float angle, float speed, bool init);
+extern void tripodGait(int reps, float stridex, float stridey, float speed, bool init);
+extern void waveGait(int reps, float stridex, float stridey, float speed, bool init);
+extern void raiseLeg(int leg, bool lift = true, int raise = 16, float speed = 60);
 
 /*
 	coordinate system is the same for every leg, so a move in X will move all legs the same, this is done by applying the transform to the x y being moved
@@ -46,78 +54,54 @@
 using Pos3 = std::tuple<int, float, float, float>;
 using Pos2 = std::tuple<int, float, float>;
 
+float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
+Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
+float MAX_RAISE = 30; // 35 is safe too
+
 // array of legs
-static std::vector<Leg> legs;
+std::vector<Leg> legs;
+bool debug_verbose = false;
+
+// used locally only
+
 static Servo servo;
-
-bool debug_verbose= false;
-
-float optimal_stride = 30;
-float optimal_angle = 30;
-float max_stride = 70;
-float max_angle = 38;
-float min_stride = 5;
-float max_speed = 200;
+static float optimal_stride = 30;
+static float optimal_angle = 20;
+static float max_stride = 70;
+static float max_angle = 38;
+static float min_stride = 5;
+static float max_speed = 200;
 
 enum GAIT { NONE, WAVE, TRIPOD, WAVE_ROTATE, TRIPOD_ROTATE };
-std::atomic<GAIT>  gait {NONE};
-std::atomic<float> current_x {0};
-std::atomic<float> current_y {0};
-std::atomic<float> current_stride {optimal_stride};
-std::atomic<float> current_angle {optimal_angle};
-std::atomic<float> current_rotate {0};
-std::atomic<float> body_height {TIBIA}; // Body height.
+static std::atomic<GAIT>  gait {NONE};
+static std::atomic<float> current_x {0};
+static std::atomic<float> current_y {0};
+static std::atomic<float> current_stride {optimal_stride};
+static std::atomic<float> current_angle {optimal_angle};
+static std::atomic<float> current_rotate {0};
+static std::atomic<float> body_height {TIBIA}; // Body height.
 
-static float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
-static Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
-
-
-// helper function to print a tuple of any size
-template<class Tuple, std::size_t N>
-struct TuplePrinter {
-    static void print(const Tuple& t)
-    {
-        TuplePrinter<Tuple, N-1>::print(t);
-        std::cout << ", " << std::get<N-1>(t);
-    }
-};
-
-template<class Tuple>
-struct TuplePrinter<Tuple, 1>{
-    static void print(const Tuple& t)
-    {
-        std::cout << std::get<0>(t);
-    }
-};
-
-template<class... Args>
-void print(const std::tuple<Args...>& t)
-{
-    std::cout << "(";
-    TuplePrinter<decltype(t), sizeof...(Args)>::print(t);
-    std::cout << ")\n";
-}
-// end helper function
-
+static volatile bool doSafeHome= false;
+static volatile bool doIdlePosition= false;
+static volatile bool doStandUp= false;
 
 // Interpolate a list of moves within the given time in seconds and issue to servos at the update rate
-void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true, bool force = false)
+void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true)
 {
 	std::vector<Pos3> moves;
 
 	if(!relative) {
-		// get the delta moves for each leg
+		// get the delta moves for each leg, we need deltas so we can interpolate them over time
 		for(auto &l : pos) {
 			int leg;
 			float x, y, z;
+			float cx, cy, cz;
 			std::tie(leg, x, y, z) = l;
-			x -= std::get<0>(legs[leg].getPosition());
-			y -= std::get<1>(legs[leg].getPosition());
-			z -= std::get<2>(legs[leg].getPosition());
-			moves.push_back(Pos3(leg, x, y, z));
+			std::tie(cx, cy, cz) = legs[leg].getPosition();
+			moves.push_back(Pos3(leg, x-cx, y-cy, z-cz));
 		}
 
-	}else{
+	} else {
 		moves = pos;
 	}
 
@@ -159,323 +143,103 @@ void safeHome()
 	for (int l = 0; l < 6; ++l) { // for each leg
 		float x, y, z;
 		std::tie(x, y, z) = legs[l].getHomeCoordinates();
-		legs[l].move(x, y, z+30);
+		legs[l].move(x, y, z + MAX_RAISE);
 		usleep(200000);
 		legs[l].move(x, y, z);
 	}
 }
 
-void raiseLeg(int leg, bool lift = true, int raise = 32, float speed = 60)
+// set the legs to a known initial position after powerup or after servos are disabled
+void initialPosition()
 {
-	legs[leg].setOnGround(!lift);
-	float time= raise / speed;
-	interpolatedMoves({Pos3(leg, 0, 0, lift ? raise : -raise)}, time, true, true);
+	// this is the position we want in leg coordinates
+	// {:pos=>[112.69999999999752, 0.0, 30.500000000000746], :rot=>0, :pos_rot=>0, :hip=>90.0, :knee=>159.8416795945004, :ankle=>69.84977038335144}
+	float x, y, z;
+	for(auto& l : legs) {
+		//l.setAngle(90, 160, 90);
+		std::tie(x, y, z) = l.getCoordinates(112.7, 0.0, 30.5); // equivalent to setting angles to ankle 70, knee 160, hip 90
+		l.move(x, y, z);
+	}
 }
 
-void raiseLegs(std::vector<int> legn, bool lift = true, int raise = 32, float speed = 60)
+// lower to ground and raise all legs and power down servos
+// NOTE presumes we know where the legs are, cannot use after powerup
+void idlePosition()
+{
+	if(!servo.isEnabled()) {
+		// after powerup or disabled servos we don't know where the legs are so set them to a known position
+		initialPosition();
+		// allow time for that to happen
+		usleep(500000);
+	}
+
+	// now move slowly into a lower position
+	std::vector<Pos3> v;
+	for (int l = 0; l < 6; ++l) { // for each leg
+		float x, y, z;
+		std::tie(x, y, z) = legs[l].getCoordinates(112.7, 0.0, 30.5); // gets idle coordinates with knee up 45°
+		v.push_back(Pos3(l, x, y, z));
+	}
+	interpolatedMoves(v, 1.0, false);
+
+	// allow time for that to happen
+	usleep(500000);
+
+	servo.enableServos(false);
+}
+
+// process to initially standup presuming servos are not powered initially
+// servos do not have enough torque to stand up usually so need to do a special
+// sequence to get the legs into the home position
+void standUp()
+{
+	float x, y, z;
+	// for each leg move knee joint up and angle at 90°
+	// TODO enable each servo as we go.
+	initialPosition();
+
+	// allow time for that to happen
+	usleep(500000);
+
+	// now move slowly into a low position hopefully standing up
+	std::vector<Pos3> v;
+	for (int l = 0; l < 6; ++l) { // for each leg
+		std::tie(x, y, z) = legs[l].getCoordinates(58, 0, -41); // gets idle coordinates with knee up 45°
+		v.push_back(Pos3(l, x, y, z));
+	}
+	interpolatedMoves(v, 0.5, false);
+
+	// now slowly move into home position
+	v.clear();
+	for (int l = 0; l < 6; ++l) { // for each leg
+		std::tie(x, y, z) = legs[l].getHomeCoordinates();
+		v.push_back(Pos3(l, x, y, z));
+	}
+	interpolatedMoves(v, 0.5, false);
+
+	// now move check each leg to home position
+	safeHome();
+}
+
+
+// raises or lowers the body height by a delta
+void changeBodyHeight(float dz)
 {
 	std::vector<Pos3> v;
-	for(int leg : legn) {
-		legs[leg].setOnGround(!lift);
-		v.push_back(Pos3(leg, 0, 0, lift ? raise : -raise));
+	for (int i = 0; i < 6; ++i) {
+		v.push_back(Pos3(i, 0, 0, -dz)); // negative delta as z is actually foot position so heigher body is lower leg
 	}
-
-	float time= raise / speed;
-	interpolatedMoves(v, time, true, true);
+	interpolatedMoves(v, 0.1); // relative move
 }
 
-// initialize legs to the specified positions
-void initLegs(std::vector<Pos2> pos, bool relative = true)
+volatile bool doabort= false;
+void signalHandler( int signum )
 {
-	float raise = 25;
-	float raise_speed = 200;
-
-	// lift leg, move to position, lower leg
-	for(auto &i : pos) {
-		int leg;
-		float x, y;
-		std::tie(leg, x, y) = i;
-		//printf("move leg: %d, x: %f, y: %f relative %d\n", leg, x, y, relative);
-		//printf("Raise leg %d\n", leg);
-		raiseLeg(leg, true, raise, raise_speed);
-		if(relative)
-			legs[leg].moveBy(x, y, 0);
-		else
-			legs[leg].move(x, y);
-
-		// lower leg
-		//printf("Lower leg %d\n", leg);
-		raiseLeg(leg, false, raise, raise_speed);
-	}
-}
-
-// rotate about robot center using a wave gait
-void rotateWaveGait(int reps, float angle, float speed, bool init)
-{
-	float raise = 30;
-	float raise_speed = 200;
-	float half_angle = angle / 2;
-	float rotate_inc = angle / 5; // the amount it rotates per step
-
-	// initialize legs to start positions
-	if(init) {
-		for (int l = 0; l < 6; ++l) {
-			raiseLeg(l, true, raise, raise_speed);
-			float x, y;
-			std::tie(x, y, std::ignore) = legs[l].getHomeCoordinates();
-			legs[l].move(x, y);
-			float a = half_angle - (rotate_inc * l);
-			legs[l].rotateBy(RADIANS(-a));
-			raiseLeg(l, false, raise, raise_speed);
-		}
-	}
-
-	// figure out speed of rotation
-	// calculate the approximate distance moved for the given angle on leg 0
-	float rad = RADIANS(rotate_inc);
-	float x, y, tx, ty;
-	std::tie(x, y, std::ignore) = legs[0].getHomeCoordinates();
-	std::tie(tx, ty, std::ignore) = legs[0].calcRotation(rad, true); // all legs seem to move the same
-	float dist = sqrtf(powf(x - tx, 2) + powf(y - ty, 2)); // the distance angle° moves the leg
-
-	int iterations = roundf((dist * update_frequency) / speed); // number of iterations
-	float da = rotate_inc / iterations; // delta angle to move each step
-	float ra = angle / iterations; // delta angle to move each iteration for reset
-	//printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
-
-	// basically ripple legs around
-	for (int i = 0; i < reps; ++i) {
-		for (int s = 0; s < 6; ++s) { // foreach step
-			raiseLeg(s, true, raise, raise_speed);
-			// execute the lambda iterations times at the specified frequency for timed
-			timed.run(iterations, [s, da, ra]() {
-				for (int l = 0; l < 6; ++l) {
-					if(l != s)
-						legs[l].rotateBy(RADIANS(-da));
-					else
-						legs[l].rotateBy(RADIANS(ra));
-				}
-			});
-
-			raiseLeg(s, false, raise, raise_speed);
-		}
-	}
-}
-// rotate about robot center using a tripod gait
-void rotateTripodGait(int reps, float angle, float speed, bool init)
-{
-	float raise = 25;
-	float raise_speed = 200;
-	float half_angle = angle / 2;
-	uint8_t legorder[][3] { {0, 2, 4}, {1, 3, 5} };
-	float tx, ty;
-	static float last_angle= 0;
-
-	// initialize legs to start positions
-	if(init) {
-		std::vector<Pos2> v;
-		for (int i = 0; i < 2; ++i) {
-			for (int j = 0; j < 3; ++j) {
-				uint8_t l = legorder[i][j];
-				float r = (i == 0) ? RADIANS(-half_angle) : RADIANS(half_angle);
-				std::tie(tx, ty, std::ignore) = legs[l].calcRotation(r, true); // absolute position from home position
-				v.push_back(Pos2(l, tx, ty));
-			}
-		}
-		initLegs(v, false); // absolute positions
-		last_angle= angle;
-	}
-
-	// figure out speed of rotation
-	// calculate the distance moved for the given angle on leg 0
-	// Currently based on the distance a leg will move for the angle anfd using the speed in mm/sec
-	// TODO should really be the speed at which the body turns in degrees/sec
-	float rad = RADIANS(angle);
-	float x, y;
-	std::tie(x, y, std::ignore) = legs[0].getHomeCoordinates();
-	std::tie(tx, ty, std::ignore) = legs[0].calcRotation(rad, true); // all legs seem to move the same
-	float dist = sqrtf(powf(x - tx, 2) + powf(y - ty, 2)); // the distance angle° moves the leg
-
-	int iterations = roundf((dist * update_frequency) / speed); // number of iterations
-	float da = angle / iterations; // delta angle to move each iteration
-	//printf("Distance moved: %f, iterations: %d, da: %f\n", dist, iterations, da);
-
-	for (int i = 0; i < reps; ++i) {
-		float dca= 0;
-		// need to check if angle has changed since last full step at the start of the step phase
-		if(last_angle != angle) {
-			// if so adjust the legs by an appropriate offset on first phase of step
-			dca = (angle - last_angle) / 2;
-			last_angle= angle;
-		}
-
-		// two phases
-		for (int s = 0; s < 2; ++s) {
-			raiseLegs({legorder[s][0], legorder[s][1], legorder[s][2]}, true, raise, raise_speed);
-			int s1 = (s == 0) ? 1 : 0;
-			// execute the lambda iterations times at the specified frequency for timed
-			timed.run(iterations, [legorder, s, s1, da, dca]() {
-				for (int j = 0; j < 3; ++j) {
-					legs[legorder[s][j]].rotateBy(RADIANS(da-dca));
-					legs[legorder[s1][j]].rotateBy(RADIANS(-da+dca));
-				}
-			});
-			raiseLegs({legorder[s][0], legorder[s][1], legorder[s][2]}, false, raise, raise_speed);
-			dca= 0; // only will adjust on first phase
-		}
-	}
-}
-
-// tripod gait. setup so it moves the body stride distance after a full step cycle (two phases per step)
-// this means that each leg moves ± stride/2 around its home position, a full step moves 2xstride
-void tripodGait(int reps, float stridex, float stridey, float speed, bool init)
-{
-	static float last_stridex = 0, last_stridey = 0;
-	float half_stridex = stridex / 2; // half stride in mm
-	float half_stridey = stridey / 2; // half stride in mm
-	float raise = 25;
-	float raise_speed = 200;
-
-	const uint8_t legorder[][3] { {0, 2, 4}, {1, 3, 5} };
-
-	if(init) {
-		// set legs to initial positions from home positions
-		// should not matter where legs actually are
-		std::vector<Pos2> v;
-		for (int i = 0; i < 2; ++i) {
-			for (int j = 0; j < 3; ++j) {
-				uint8_t l = legorder[i][j];
-				float x, y, z;
-				std::tie(x, y, z) = legs[l].getHomeCoordinates();
-				if(i == 0)
-					v.push_back(Pos2(l, x - half_stridex, y - half_stridey));
-				else
-					v.push_back(Pos2(l, x + half_stridex, y + half_stridey));
-			}
-		}
-		initLegs(v, false); // absolute positions
-		last_stridex = stridex;
-		last_stridey = stridey;
-	}
-
-	// calculate time this move should take, based on the amount the body will move over the ground
-	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
-	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
-
-	float dx= 0, dy= 0;
-	// need to check if stride has changed since last full step
-	if(last_stridex != stridex || last_stridey != stridey) {
-		// if so adjust the legs by an appropriate offset on first phase of step
-		dx = (stridex - last_stridex) / 2;
-		dy = (stridey - last_stridey) / 2;
-
-		last_stridex = stridex;
-		last_stridey = stridey;
-
-	}
-
-	for (int i = 0; i < reps; ++i) {
-		// this is two strides we need to move each stride in the calculated time
-		// execute step state 1
-		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(legorder[0][0],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[0][1],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[0][2],  stridex - dx,  stridey - dy, 0),
-			Pos3(legorder[1][0], -stridex + dx, -stridey + dy, 0),
-			Pos3(legorder[1][1], -stridex + dx, -stridey + dy, 0),
-			Pos3(legorder[1][2], -stridex + dx, -stridey + dy, 0)
-		},
-		time, true);
-		raiseLegs({legorder[0][0], legorder[0][1], legorder[0][2]}, false, raise, raise_speed);
-
-		// execute step state 2
-		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, true, raise, raise_speed);
-		interpolatedMoves({
-			Pos3(legorder[1][0],  stridex,  stridey, 0),
-			Pos3(legorder[1][1],  stridex,  stridey, 0),
-			Pos3(legorder[1][2],  stridex,  stridey, 0),
-			Pos3(legorder[0][0], -stridex, -stridey, 0),
-			Pos3(legorder[0][1], -stridex, -stridey, 0),
-			Pos3(legorder[0][2], -stridex, -stridey, 0)
-		},
-		time, true);
-		raiseLegs({legorder[1][0], legorder[1][1], legorder[1][2]}, false, raise, raise_speed);
-	}
-}
-
-// wave gait. setup so it moves ±stride/2 around the home position
-void waveGait(int reps, float stridex, float stridey, float speed, bool init)
-{
-	const uint8_t legorder[] {2, 1, 0, 3, 4, 5};
-	static float last_stridex = 0, last_stridey = 0;
-	float half_stridex = stridex / 2; // half stride in mm
-	float half_stridey = stridey / 2; // half stride in mm
-	float stridex_inc = stridex / 5; // the amount it moves per step
-	float stridey_inc = stridey / 5; // the amount it moves per step
-	float raise = 25;
-	float raise_speed = 200;
-
-	// set legs to initial positions from home positions at start of new gait
-	// should not matter where legs actually are
-	if(init) {
-		std::vector<Pos2> v;
-		for (int i = 0; i < 6; ++i) { // for each leg
-			uint8_t l = legorder[i];
-			float x, y, z;
-			std::tie(x, y, z) = legs[l].getHomeCoordinates();
-			v.push_back(Pos2(l, x - (half_stridex - stridex_inc * i), y - (half_stridey - stridey_inc * i)));
-			//std::cout << "init: "; print(v.back());
-		}
-
-		initLegs(v, false); // absolute positions
-		last_stridex = stridex;
-		last_stridey = stridey;
-	}
-
-	// calculate time this move should take, based on the amount the body will move over the ground
-	float dist= sqrtf(powf(stridex, 2) + powf(stridey, 2));  // distance over the ground
-	float time= dist / speed; // the time it will take to move that distance at the given speed (mm/sec)
-
-	// need to check if stride has changed since last full step at the start of the step phase
-	float dx= 0, dy= 0, dxi= 0, dyi= 0;
-	if(last_stridex != stridex || last_stridey != stridey) {
-		// if so adjust the legs to appropriate positions
-		dx = (stridex - last_stridex)/2;
-		dy = (stridey - last_stridey)/2;
-		dxi= dx/2.5; // stride change/5
-		dyi= dy/2.5;
-		last_stridex = stridex;
-		last_stridey = stridey;
-	}
-
-	for (int i = 0; i < reps; ++i) {
-
-		for (int s = 0; s < 6; ++s) { // foreach step
-			uint8_t leg = legorder[s];
-			std::vector<Pos3> v;
-
-			// reset the current leg
-			v.push_back(Pos3(leg, stridex-dx, stridey-dy, 0));
-			// printf("reset l= %d, dx= %f, dy= %f\n", leg, dx/2, dy/2); std::cout << "reset: "; print(v.back());
-
-			// move the other legs backwards
-			for (int j = 0; j < 6; ++j) { // for each leg
-				uint8_t l = legorder[j];
-				if(l != leg){
-					v.push_back(Pos3(l, -stridex_inc-(dx - (dxi*j)), -stridey_inc-(dy - (dyi*j)), 0));
-					// printf("move l= %d, dx= %f, dy= %f\n", l, (dx/2 - (dx/5*j)), (dy/2 - (dy/5*j))); std::cout << "move: "; print(v.back());
-				}
-			}
-
-			// execute actual step
-			raiseLeg(leg, true, raise, raise_speed);
-			interpolatedMoves(v, time/6, true); // each step should take 1/6 of the time calculated for the total move
-			raiseLeg(leg, false, raise, raise_speed);
-			// only adjust first phase of step
-			dx= dy= dxi= dyi= 0;
-		}
-	}
+    std::cout << "Interrupt signal (" << signum << ") received.\n";
+    if(signum == SIGTERM){
+    	doabort= true;
+    	printf("Exiting\n");
+    }
 }
 
 #pragma GCC diagnostic ignored "-Wswitch"
@@ -484,67 +248,97 @@ void joystickControl()
 {
 	GAIT last_gait = NONE;
 	bool running = true;
-	bool gait_changed= false;
-	float last_body_height= body_height;
+	bool first_time= true;
+	bool gait_changed = false;
+	float last_body_height = body_height;
+
+	// register signal and signal handler
+	signal(SIGTERM, signalHandler);
+	signal(SIGHUP, signalHandler);
 
 	printf("Remote joystick control...\n");
 
 	while(running) {
-		gait_changed= (gait_changed || gait != last_gait);
-		last_gait= gait;
-
-		if(gait != NONE && gait <  WAVE_ROTATE && (std::abs(current_x) > 0.0001F || std::abs(current_y) > 0.0001F))  {
-			// current_x and current_y are speed percentage in that direction
-			// calculate the vector of movement in percentage
-			float d = sqrtf(powf(current_x, 2) + powf(current_y, 2)); // vector size
-
-			float x = current_stride * current_x / d; // normalize for proportion move in X, this is stride in mm in X
-			float y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
-
-			float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
-			if(speed < 30) speed = 30;
-			//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
-
-			// execute one entire step which will move body over the ground by current_stride mm
-			switch(gait) {
-				case WAVE:
-				  	waveGait(1, x, y, speed, gait_changed);
-				  	break;
-				case TRIPOD:
-					tripodGait(1, x, y, speed, gait_changed);
-					break;
+		try {
+			if(first_time) {
+				first_time= false;
+				//standUp();
+				idlePosition();
 			}
-			gait_changed= false;
 
-		} else if(gait >= WAVE_ROTATE && std::abs(current_rotate) > 0.001F) {
-			float speed = max_speed * std::abs(current_rotate) / 100.0F ;
-			if(speed < 20) speed = 20;
-			float a = current_angle;
-			if(current_rotate < 0) a= -a; // direction of rotate
-
-			switch(gait) {
-				case WAVE_ROTATE:
-					rotateWaveGait(1, a, speed, gait_changed);
-					break;
-				case TRIPOD_ROTATE:
-					rotateTripodGait(1, a, speed, gait_changed);
-					break;
+			if(doIdlePosition) {
+				doIdlePosition= false;
+				idlePosition();
+				continue;
 			}
-			gait_changed= false;
+			if(doSafeHome) {
+				doSafeHome= false;
+				safeHome();
+				continue;
+			}
+			if(doStandUp) {
+				doStandUp= false;
+				standUp();
+				continue;
+			}
 
-		}else {
-			if(body_height != last_body_height) {
-				float dz= body_height - last_body_height;
-				std::vector<Pos3> v;
-				for (int i = 0; i < 6; ++i) {
-				    v.push_back(Pos3(i, 0, 0, dz));
+			gait_changed = (gait_changed || gait != last_gait);
+			last_gait = gait;
+
+			if(gait != NONE && gait <  WAVE_ROTATE && (std::abs(current_x) > 0.0001F || std::abs(current_y) > 0.0001F))  {
+				// current_x and current_y are speed percentage in that direction
+				// calculate the vector of movement in percentage
+				float d = sqrtf(powf(current_x, 2) + powf(current_y, 2)); // vector size
+
+				float x = current_stride * current_x / d; // normalize for proportion move in X, this is stride in mm in X
+				float y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
+
+				float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
+				if(speed < 30) speed = 30;
+				//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
+
+				// execute one entire step which will move body over the ground by current_stride mm
+				switch(gait) {
+					case WAVE:
+						waveGait(1, x, y, speed, gait_changed);
+						break;
+					case TRIPOD:
+						tripodGait(1, x, y, speed, gait_changed);
+						break;
 				}
-				interpolatedMoves(v, 30, true, true);
-				last_body_height= body_height;
+				gait_changed = false;
+
+			} else if(gait >= WAVE_ROTATE && std::abs(current_rotate) > 0.001F) {
+				float speed = max_speed * std::abs(current_rotate) / 100.0F ;
+				if(speed < 20) speed = 20;
+				float a = current_angle;
+				if(current_rotate < 0) a = -a; // direction of rotate
+
+				switch(gait) {
+					case WAVE_ROTATE:
+						rotateWaveGait(1, a, speed, gait_changed);
+						break;
+					case TRIPOD_ROTATE:
+						rotateTripodGait(1, a, speed, gait_changed);
+						break;
+				}
+				gait_changed = false;
+
+			} else {
+				if(body_height != last_body_height) {
+					changeBodyHeight(body_height - last_body_height);
+					last_body_height = body_height;
+				}
 			}
+
+			usleep(10); // just to give things a break
+
+		}catch(std::range_error& e) {
+			// we don't want to die when this happens
+			printf("Continuing after: range error - %s\n", e.what());
 		}
 
-		usleep(10); // just to give things a break
+		if(doabort) running= false;
 	}
 
 	printf("Exited joystick control\n");
@@ -572,52 +366,68 @@ bool handle_request(const char *req)
 				case 3: gait = TRIPOD; break;
 				case 4: gait = TRIPOD_ROTATE; break;
 				case 5: gait = WAVE_ROTATE; break;
-				case 6: servo.enableServos(false); break;
-				case 7: gait = NONE; safeHome(); break;
+				case 6: gait = NONE; doSafeHome= true; break;
+				case 7: gait= NONE; doIdlePosition= true; break;
+				case 8: doStandUp= true; break;
 				default: printf("Unknown button: %d\n", v);
 			}
 			break;
 
 		case 'X':
 			current_x = std::stof(cmd, &p1); // x is the proportional speed in X 0 - 100
-			printf("x set to: %f\n", current_x.load());
+			debug_printf("x set to: %f\n", current_x.load());
 			break;
 
 		case 'Y':
 			current_y = std::stof(cmd, &p1); // y is the proportional speed in Y 0 - 100
-			printf("y set to: %f\n", current_y.load());
+			debug_printf("y set to: %f\n", current_y.load());
 			break;
 
 		case 'S': // stride
 			x = std::stof(cmd, &p1); // we now have 0 - 100
 			current_stride = max_stride * x / 100; // take percentage of max stride
 			current_angle = max_angle * x / 100; // take percentage of max angle
-			printf("stride set to: %f%% - %f, angle set to: %f\n", x, current_stride.load(), current_angle.load());
+			debug_printf("stride set to: %f%% - %f, angle set to: %f\n", x, current_stride.load(), current_angle.load());
 			break;
 
 		case 'R': // Rotate using current gait if using a rotate gait
 			x = std::stof(cmd, &p1); // rotation -100 to 100
-			current_rotate= x;
-			printf("set rotate to: %f\n", current_rotate.load());
+			current_rotate = x;
+			debug_printf("set rotate to: %f\n", current_rotate.load());
 			break;
 
 		case 'U': // up or down
 			v = std::stoi(cmd, &p1);
 			if(v > 0) {
-				body_height = body_height + 5;
-			}else if(v < 0) {
-				body_height = body_height - 5;
+				body_height = body_height + 1;
+			} else if(v < 0) {
+				body_height = body_height - 1;
+			}else {
+				body_height = TIBIA;
 			}
-			printf("Set body height to %f\n", body_height.load());
+			debug_printf("Set body height to %f\n", body_height.load());
 			break;
 
 		case 'L': // left or right
+			v = std::stoi(cmd, &p1);
+			if(v > 0) {
+				current_stride= current_stride + 1;
+			} else if(v < 0) {
+				current_stride= current_stride - 1;
+			} else {
+				current_stride= optimal_stride;
+			}
+
+			if(current_stride > max_stride) current_stride= max_stride;
+			else if(current_stride < min_stride) current_stride= min_stride;
+
+			debug_printf("Set stride to %f\n", current_stride.load());
 			break;
 
 		case 'H': // up or down -100% to 100%
 			v = std::stoi(cmd, &p1);
-			body_height = TIBIA * (100+v)/100.0;
-			printf("Set body height to %f\n", body_height.load());
+			body_height = TIBIA * (100 + v) / 100.0;
+			debug_printf("Set body height to %f\n", body_height.load());
 			break;
 
 		case 'A':
@@ -625,14 +435,14 @@ bool handle_request(const char *req)
 			v = std::stoi(cmd, &p1);
 			x = std::stof(cmd.substr(p1), &p2);
 			servo.updateServo(v, x);
-			printf("Set Servo %d to %f°\n", v, x);
+			debug_printf("Set Servo %d to %f°\n", v, x);
 			break;
 
 		case 'E':
 			// enable or disable servos
 			v = std::stoi(cmd, &p1);
 			servo.enableServos(v == 1);
-			printf("Servos %s\n", v==1 ? "Enabled" : "Disabled");
+			debug_printf("Servos %s\n", v == 1 ? "Enabled" : "Disabled");
 			break;
 
 		default: printf("Unknown MQTT command: %c\n", c);
@@ -678,7 +488,7 @@ int main(int argc, char *argv[])
 	bool absol = false;
 	bool do_walk = false;
 	uint8_t gait = 0;
-	bool do_test= false;
+	bool do_test = false;
 
 	// setup an array of legs, using this as they are not copyable.
 	//  position angle, home angle, ankle, knee, hip
@@ -689,16 +499,22 @@ int main(int argc, char *argv[])
 	legs.emplace_back("middle right", 180,  180, 12, 13, 14, servo); // middle right
 	legs.emplace_back("front right",  120, -120, 15, 16, 17, servo); // front right
 
-	while ((c = getopt (argc, argv, "hH:RDamc:l:j:f:x:y:z:s:S:TIL:W:JP:vE:")) != -1) {
+	try{
+	while ((c = getopt (argc, argv, "hH:RDaAmMc:l:j:f:x:y:z:s:S:TIL:W:JP:vE:b:B:")) != -1) {
 		switch (c) {
 			case 'h':
-				printf("Usage:\n -m home\n");
+				printf("Usage:\n");
+				printf(" -m home\n");
+				printf(" -M stand up\n");
 				printf(" -x n Set x to n\n");
 				printf(" -y n Set y to n\n");
 				printf(" -z n Set z to n\n");
 				printf(" -l n Set leg to n\n");
 				printf(" -s n Set speed to n mm/sec\n");
 				printf(" -a Set absolute mode\n");
+				printf(" -A Safe Home\n");
+				printf(" -b n Set leg left delta to n\n");
+				printf(" -B n Set body height to n\n");
 				printf(" -f n Set frequency to n Hz\n");
 				printf(" -c n Set cycle count to n\n");
 				printf(" -S n Set servo n to angle x\n");
@@ -716,10 +532,9 @@ int main(int argc, char *argv[])
 				return 1;
 
 			case 'H': mqtt_start(optarg, handle_request); break;
-			case 'v': debug_verbose= true;  break;
+			case 'v': debug_verbose = true;  break;
 
 			case 'D': printf("Hit any key...\n"); getchar(); return 0;
-			case 'J': joystickControl(); return 0;
 
 			case 'S': servo.updateServo(atoi(optarg), x); break;
 			case 'P': usleep(atoi(optarg) * 1000); break;
@@ -728,13 +543,18 @@ int main(int argc, char *argv[])
 			case 'f': update_frequency = atof(optarg); break;
 
 			case 'a': absol = true; break;
+			case 'b': MAX_RAISE = atof(optarg); break;
+			case 'B': { float dz = atof(optarg); changeBodyHeight(dz); body_height= body_height + dz; } break;
 			case 's': speed = atof(optarg); break;
-			case 'm':
-				home(leg);
-				break;
-			case 'c':
-				reps = atoi(optarg);
-				break;
+			case 'm': home(leg); break;
+			case 'M': standUp(); break;
+			case 'A': safeHome(); break;
+			case 'c': reps = atoi(optarg);  break;
+
+			case 'J':
+				joystickControl();
+				return 0;
+
 			case 'W':
 				do_walk = true;
 				gait = atoi(optarg);
@@ -761,7 +581,7 @@ int main(int argc, char *argv[])
 				break;
 
 			case 'T':
-				do_test= true;
+				do_test = true;
 				break;
 
 			case 'I':
@@ -784,7 +604,9 @@ int main(int argc, char *argv[])
 				else
 					fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
 				return 1;
+
 			default:
+				fprintf(stderr, "unimplemented option: `-%c'.\n", c);
 				abort ();
 		}
 	}
@@ -792,10 +614,10 @@ int main(int argc, char *argv[])
 	if(do_test) {
 		waveGait(1, x, y, speed, true);
 
-		waveGait(1, x, y+80, speed, false);
+		waveGait(1, x, y + 80, speed, false);
 		waveGait(1, x, y, speed, false);
 
-	}else if(do_walk) {
+	} else if(do_walk) {
 		switch(gait) {
 			case 0: waveGait(reps, x, y, speed, true); break;
 			case 1: tripodGait(reps, x, y, speed, true); break;
@@ -805,7 +627,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//printf("Hit any key...\n"); getchar();
+	}catch(...) {
+		fprintf(stderr, "Caught unhandled exception... Exiting\n");
+	}
 	return 0;
 }
 

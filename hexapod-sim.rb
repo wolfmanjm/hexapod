@@ -61,14 +61,18 @@ $basepoly= [
 
 # transform for leg position on body
 class Numeric
-  def degrees
+  def radians
     self * Math::PI / 180.0
+  end
+
+  def degrees
+    self * 180.0/Math::PI
   end
 end
 
 def transform(angle, x, y)
-  tx= x *  Math::cos(angle.degrees) + y * Math::sin(angle.degrees)
-  ty= x * -Math::sin(angle.degrees) + y * Math::cos(angle.degrees)
+  tx= x *  Math::cos(angle.radians) + y * Math::sin(angle.radians)
+  ty= x * -Math::sin(angle.radians) + y * Math::cos(angle.radians)
   [tx, ty]
 end
 
@@ -117,14 +121,34 @@ def _inverse_kinematics(x, y, z)
   return [h, k, a]
 end
 
+require 'rmath3d/rmath3d'
+include RMath3D
 def _forward_kinematics(h, k, a)
   # Calculate the x,y,z of the foot given the angles of the leg joints, in degrees.
 
-  # TODO
+  # adjust to match actual servos
+  h += 90
+  k -= 90
+  a= -a
 
-  print "x= #{x}, y= #{y}, z= #{z}\n"
+  # the foot point
+  vtibia = RVec3.new($tibia, 0, 0)
 
-  return [x, y, z]
+  # rotation and translations to apply to foot point
+  r1 = RMtx4.new.rotationAxis( RVec3.new(0,0,-1), h.radians )
+  r2 = RMtx4.new.rotationAxis( RVec3.new(0,-1,0), k.radians )
+  r3 = RMtx4.new.rotationAxis( RVec3.new(0,-1,0), a.radians )
+  t1= RMtx4.new.translation( $coxa, 0.0, 0.0 )
+  t2= RMtx4.new.translation( $femur, 0.0, 0.0 )
+
+  # concatenate all the matrices to get the final foot position
+  am= r1 * t1
+  am= am * r2
+  am= am * t2
+  am= am * r3
+  pos = vtibia.transform( am )
+
+  return [-pos.x, pos.y, pos.z]
 end
 
 #
@@ -284,6 +308,7 @@ def change_height(d)
     # transform into leg coordinates
     x, y= transform(l[:rot], x, y)
     z += d # add the delta to the  in leg coordinates
+    puts "#{x}, #{y}, #{z}"
     l[:hip], l[:knee], l[:ankle] =  _inverse_kinematics(x, y, z)
 
     # transform back to bot coords
@@ -292,6 +317,15 @@ def change_height(d)
   end
 end
 
+def run_test(d)
+  l= $legs[1]
+  k= l[:knee]
+  a= l[:ankle]
+  k+=d
+  a+=d
+  l[:knee]= k
+  l[:ankle]= a
+end
 #
 # display stuff
 #
@@ -454,7 +488,12 @@ keyboard = Proc.new do|key, x, y|
   when ?h, ?H, ?k, ?K, ?a, ?A
     k= $kmap[key]
     $legs[$leg][k[0]] += k[1]
-    puts $legs[$leg][k[0]]
+    # calculate new x,y,z position  for the leg
+    x, y, z= _forward_kinematics($legs[$leg][:hip], $legs[$leg][:knee], $legs[$leg][:ankle])
+    # transform it for the leg
+    x, y= transform(-$legs[$leg][:rot], x, y)
+    $legs[$leg][:pos]= [x, y, z]
+    p $legs[$leg]
     glutPostRedisplay()
 
   when ?w
@@ -473,7 +512,10 @@ keyboard = Proc.new do|key, x, y|
     change_stance(key == ?D ? 1 : -1)
 
   when ?U, ?u
-    change_height(key == ?U ? 1 : -1)
+    change_height(key == ?U ? 0.2 : -0.2)
+
+  when ?T, ?\x14
+    run_test(key == ?T ? 1 : -1)
 
   # when ?R
   #   $stream_pos= false
@@ -597,17 +639,17 @@ special = lambda do |key,x,y|
     $nstridey= 40
     $nstridex= 0
   when GLUT_KEY_LEFT
-    legx -= 1
+    legx -= 0.1
   when GLUT_KEY_RIGHT
-    legx += 1
+    legx += 0.1
   when GLUT_KEY_UP
     legy -= 1
   when GLUT_KEY_DOWN
     legy += 1
   when GLUT_KEY_PAGE_UP
-    legz += 1
+    legz += 0.1
   when GLUT_KEY_PAGE_DOWN
-    legz -= 1
+    legz -= 0.1
   end
 
   unless $animate
@@ -621,6 +663,7 @@ special = lambda do |key,x,y|
     $legs[$leg][:pos][0]= legx
     $legs[$leg][:pos][1]= legy
     $legs[$leg][:pos][2]= legz
+    p $legs[$leg]
   else
     # change stride
     $nstridex += (legx*5)

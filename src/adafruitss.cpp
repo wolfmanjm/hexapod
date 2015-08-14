@@ -35,6 +35,17 @@ Changes:
 #include <unistd.h>
 #include <math.h>
 
+#define PCA9685_SUBADR1 0x2
+#define PCA9685_SUBADR2 0x3
+#define PCA9685_SUBADR3 0x4
+
+#define PCA9685_MODE1    0x0
+#define PCA9685_PRESCALE 0xFE
+
+#define PCA9685_MODE1_REG       0x00
+#define PCA9685_PRESCALE_REG    0xFE
+#define LED0_REG                0x06
+
 //using namespace myupm;
 
 adafruitss::adafruitss(int bus,int i2c_address)
