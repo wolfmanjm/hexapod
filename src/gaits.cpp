@@ -1,6 +1,7 @@
 #include "Servo.h"
 #include "Leg.h"
 #include "Timed.h"
+#include "helpers.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -76,6 +77,10 @@ void rotateWaveGait(int reps, float angle, float speed, bool init)
 	float raise_speed = 200;
 	float half_angle = angle / 2;
 	float rotate_inc = angle / 5; // the amount it rotates per step
+	static float last_angle = 0;
+
+	// if the sign changes we need to re init legs
+	if(sgn(last_angle) != sgn(angle)) init = true;
 
 	// initialize legs to start positions
 	if(init) {
@@ -88,6 +93,7 @@ void rotateWaveGait(int reps, float angle, float speed, bool init)
 			legs[l].rotateBy(RADIANS(-a));
 			raiseLeg(l, false, raise, raise_speed);
 		}
+		last_angle = angle;
 	}
 
 	// figure out speed of rotation
@@ -130,6 +136,9 @@ void rotateTripodGait(int reps, float angle, float speed, bool init)
 	uint8_t legorder[][3] { {0, 2, 4}, {1, 3, 5} };
 	float tx, ty;
 	static float last_angle = 0;
+
+	// if the sign changes we need to re init legs
+	if(sgn(last_angle) != sgn(angle)) init = true;
 
 	// initialize legs to start positions
 	if(init) {

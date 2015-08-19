@@ -1,5 +1,10 @@
+#pragma once
+
 #include <iostream>
 #include <stdarg.h>
+#include <tuple>
+
+extern bool debug_verbose;
 
 // helper function to print a tuple of any size
 template<class Tuple, std::size_t N>
@@ -27,11 +32,7 @@ void print(const std::tuple<Args...> &t)
 	std::cout << ")\n";
 }
 
-void debug_printf(const char *format, ...)
-{
-	if(!debug_verbose) return;
-	va_list args;
-  	va_start (args, format);
-  	vprintf (format, args);
-  	va_end (args);
-}
+void debug_printf(const char *format, ...);
+int map(int x, int in_min, int in_max, int out_min, int out_max);
+
+#define sgn(x) (((x) > 0) - ((x) < 0))

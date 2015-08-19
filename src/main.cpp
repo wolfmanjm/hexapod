@@ -60,7 +60,6 @@ float MAX_RAISE = 30; // 35 is safe too
 
 // array of legs
 std::vector<Leg> legs;
-bool debug_verbose = false;
 
 // used locally only
 
