@@ -11,6 +11,7 @@ INERTIA_FACTOR = 0.5
 SCALE_FACTOR = 0.01
 SCALE_INCREMENT = 0.01
 TIMER_FREQUENCY_MILLIS = 20
+HZ= 1000.0/TIMER_FREQUENCY_MILLIS
 
 $rotl = 1 * Math::PI / 180
 $last_time = 0
@@ -202,88 +203,165 @@ def legdown(l)
   $legup[l]= false
 end
 
-$first= true
-$liftleg= 0
-$rcnt= 0
-def rotate_walk
-  dr= 0.5
-  if $rcnt == 0
-    legup($liftleg)
+class WaveRotateGait
+  # wave rotate gait called @50Hz 1000/TIMER_FREQUENCY_MILLIS
+  def initialize()
+    @first= true
+    @liftleg= 0
+    @rcnt= 0
   end
 
-  (0..5).each do |l|
-    if $legup[l]
-      do_rotate_leg(l, -dr*5)
-    else
-      do_rotate_leg(l, dr)
+  def walk
+    dr= 0.5
+    if @rcnt == 0
+      legup(@liftleg)
+    end
+
+    (0..5).each do |l|
+      if $legup[l]
+        do_rotate_leg(l, -dr*5)
+      else
+        do_rotate_leg(l, dr)
+      end
+    end
+
+    @rcnt+=1
+    if @rcnt > 10
+      legdown(@liftleg)
+      @liftleg+=1
+      @liftleg= 0 if(@liftleg > 5)
+      @rcnt= 0
     end
   end
-
-  $rcnt+=1
-  if $rcnt > 10
-    legdown($liftleg)
-    $liftleg+=1
-    $liftleg= 0 if($liftleg > 5)
-    $rcnt= 0
-  end
-
 end
 
-# tripod gait called @50Hz 1000/TIMER_FREQUENCY_MILLIS
-$lg1= 0
-$lg2= 1
-$cnt= 0
-$legorder= [[0, 2, 4], [1, 3, 5]]
-HZ= 1000.0/TIMER_FREQUENCY_MILLIS
-$nstridey= 40.0
+$nstridey= 30.0
 $nstridex= 0.0
-$stridey= nil
-$stridex= nil
-def walk
 
-  if $first
-    ix= $nstridex
-    iy= $nstridey
-    # init legs
-    $legorder[$lg1].each { |l| do_move_leg_by(l, -ix/2, -iy/2, 0) }
-    $legorder[$lg2].each { |l| do_move_leg_by(l, ix/2, iy/2, 0) }
-    $stridex= $nstridex
-    $stridey= $nstridey
-    $first= false
+class TripodGait
+  # tripod gait called @50Hz 1000/TIMER_FREQUENCY_MILLIS
+  def initialize()
+    @lg1= 0
+    @lg2= 1
+    @cnt= 0
+    @legorder= [[0, 2, 4], [1, 3, 5]]
+    @stridey= nil
+    @stridex= nil
+    @first= true
   end
 
-  # start of cycle
-  if $cnt == 0
-    # lift legs
-    $legorder[$lg1].each { |l| legup(l) }
-    if $stridex != $nstridex or $stridey != $nstridey
-      # adjust for new stride. we do this at the start of a new cycle and adjust the legs to new start positions
-      dx= $nstridex - $stridex
-      dy= $nstridey - $stridey
-      $legorder[$lg1].each { |l| do_move_leg_by(l, -dx/2, -dy/2, 0) }
-      $legorder[$lg2].each { |l| do_move_leg_by(l, dx/2, dy/2, 0) }
+  def walk
+    if @first
+      ix= $nstridex
+      iy= $nstridey
+      # init legs
+      @legorder[@lg1].each { |l| do_move_leg_by(l, -ix/2, -iy/2, 0) }
+      @legorder[@lg2].each { |l| do_move_leg_by(l, ix/2, iy/2, 0) }
+      @stridex= $nstridex
+      @stridey= $nstridey
+      @first= false
     end
 
-    $stridex= $nstridex
-    $stridey= $nstridey
+    # start of cycle
+    if @cnt == 0
+      # lift legs
+      @legorder[@lg1].each { |l| legup(l) }
+      if @stridex != $nstridex or @stridey != $nstridey
+        # adjust for new stride. we do this at the start of a new cycle and adjust the legs to new start positions
+        dx= $nstridex - @stridex
+        dy= $nstridey - @stridey
+        @legorder[@lg1].each { |l| do_move_leg_by(l, -dx/2, -dy/2, 0) }
+        @legorder[@lg2].each { |l| do_move_leg_by(l, dx/2, dy/2, 0) }
+        @stridex= $nstridex
+        @stridey= $nstridey
+      end
+    end
+
+    dx= @stridex/HZ
+    dy= @stridey/HZ
+
+    # for each group of legs
+    @legorder[@lg1].each { |l| do_move_leg_by(l, dx, dy, 0)   }
+    @legorder[@lg2].each { |l| do_move_leg_by(l, -dx, -dy, 0) }
+
+    @cnt += 1
+
+    # end of cycle
+    if @cnt >= HZ
+      @legorder[@lg1].each { |l| legdown(l) }
+      @lg1, @lg2 = @lg2, @lg1
+      @cnt= 0
+    end
+
+  end
+end
+
+class RippleGait
+  # ripple gait called @50Hz 1000/TIMER_FREQUENCY_MILLIS
+  # we run two waves in one on left one on right and they are 180° out of phase with each other
+  def initialize()
+    @rtick_cnt= 0
+    @ltick_cnt= HZ/2
+
+    # left and right legs
+    @rleg= [5, 4, 3]
+    @lleg= [1, 2, 0]
+    legup(@lleg[0])
+
+    @stridey= $nstridey
+    @stridex= $nstridex
+    # move half the cycles forward
+    @dx= (@stridex/HZ)/2.0
+    @dy= (@stridey/HZ)/2.0
+    @first= true
   end
 
-  dx= $stridex/HZ
-  dy= $stridey/HZ
+  def walk
+    # if @first
+    #   @first= false
+    #   ix= $nstridex/3.0
+    #   iy= $nstridey/3.0
+    #   # init legs
+    #   @legorder[0].each_with_index { |l, i| do_move_leg_by(l, ix*i, iy*i, 0) }
+    #   @legorder[1].each_with_index { |l, i| do_move_leg_by(l, ix*i, iy*i, 0) }
+    #   @stridex= $nstridex
+    #   @stridey= $nstridey
+    # end
 
-  # for each group of legs
-  $legorder[$lg1].each { |l| do_move_leg_by(l, dx, dy, 0)   }
-  $legorder[$lg2].each { |l| do_move_leg_by(l, -dx, -dy, 0) }
+    # start of cycle right legs
+    if @rtick_cnt == 0
+      legup(@rleg[0])
+    end
+    if @ltick_cnt == 0
+      legup(@lleg[0])
+    end
 
-  $cnt += 1
+    # for each group of legs
+    do_move_leg_by(@rleg[0], -@dx*2, -@dy*2, 0)
+    do_move_leg_by(@rleg[1], @dx, @dy, 0)
+    do_move_leg_by(@rleg[2], @dx, @dy, 0)
 
-  # end of cycle
-  if $cnt >= HZ
-    $legorder[$lg1].each { |l| legdown(l) }
-    $lg1, $lg2 = $lg2, $lg1
-    $cnt= 0
+    do_move_leg_by(@lleg[0], -@dx*2, -@dy*2, 0)
+    do_move_leg_by(@lleg[1], @dx, @dy, 0)
+    do_move_leg_by(@lleg[2], @dx, @dy, 0)
+
+    @rtick_cnt += 1
+    @ltick_cnt += 1
+
+    # end of cycle
+    if @rtick_cnt >= HZ
+      @rtick_cnt= 0
+      legdown(@rleg[0])
+      @rleg.rotate!
+    end
+
+    if @ltick_cnt >= HZ
+      @ltick_cnt= 0
+      legdown(@lleg[0])
+      @lleg.rotate!
+    end
+
   end
-
 end
 
 # change the distance the legs are from the center
@@ -672,6 +750,7 @@ special = lambda do |key,x,y|
 
 end
 
+$gait= nil
 timer = lambda do |value|
   $ftime += 0.01
   if $rotate
@@ -680,8 +759,10 @@ timer = lambda do |value|
   end
 
   if $animate
-    walk
-    #rotate_walk
+    $gait= RippleGait.new unless $gait
+    #$gait= TripodGait.new unless $gait
+    #$gait= WaveRotateGait.new unless $gait
+    $gait.walk
   end
 
   glutTimerFunc(TIMER_FREQUENCY_MILLIS , timer, 0)

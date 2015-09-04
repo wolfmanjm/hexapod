@@ -64,8 +64,8 @@ std::vector<Leg> legs;
 // used locally only
 
 static Servo servo;
-static float optimal_stride = 30;
-static float optimal_angle = 10;
+static float optimal_stride = 60;
+static float optimal_angle = 20;
 static float max_stride = 70;
 static float max_angle = 38;
 static float min_stride = 5;
@@ -139,12 +139,14 @@ void home(int8_t l = -1)
 // home all legs but raise them first
 void safeHome()
 {
-	for (int l = 0; l < 6; ++l) { // for each leg
+	uint8_t legorder[] { 0, 3, 1, 4, 2, 5 };
+	float time= 0.1;
+	for (int i = 0; i < 6; ++i) { // for each leg
+		int l= legorder[i];
 		float x, y, z;
 		std::tie(x, y, z) = legs[l].getHomeCoordinates();
-		legs[l].move(x, y, z + MAX_RAISE);
-		usleep(200000);
-		legs[l].move(x, y, z);
+		interpolatedMoves({Pos3(l, x, y, z + MAX_RAISE)}, time, false);
+		interpolatedMoves({Pos3(l, x, y, z)}, time, false);
 	}
 }
 
@@ -392,6 +394,20 @@ bool handle_request(const char *req)
 		case 'R': // Rotate using current gait if using a rotate gait
 			x = std::stof(cmd, &p1); // rotation -100 to 100
 			current_rotate = x;
+			debug_printf("set rotate to: %f\n", current_rotate.load());
+			break;
+
+		case 'T': // right and left analog triggers +100 is right -100 is left
+			x = std::stof(cmd, &p1); // rotation -100 to 100
+			if(std::abs(x) > 0) {
+				gait = TRIPOD_ROTATE;
+				current_rotate = x;
+			}else{
+				gait = TRIPOD;
+				current_rotate= 0;
+				current_x= 0;
+				current_y= 0;
+			}
 			debug_printf("set rotate to: %f\n", current_rotate.load());
 			break;
 

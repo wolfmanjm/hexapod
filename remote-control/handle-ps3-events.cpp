@@ -33,6 +33,8 @@
 #define     square           303
 
 #define     select          288
+#define     left_thumb      289
+#define     right_thumb     290
 #define     start           291
 
 #define     HatLeft         295
@@ -190,7 +192,7 @@ void signalHandler( int signum )
     }
 }
 
-std::map<int, int> button_map = { {triangle, 3}, {circle, 4}, {cross, 2}, {square, 5}, {select, 6}, {P3,  7}, {start, 8} };
+std::map<int, int> button_map = { {right_thumb, 1}, {left_thumb, 1}, {triangle, 3}, {circle, 4}, {cross, 2}, {square, 5}, {select, 6}, {P3,  7}, {start, 8} };
 int main (int argc, char **argv)
 {
 	int rd, i, j, k;
@@ -361,9 +363,11 @@ tryagain:
 						break;
 					case RIGHTTRIGGER:
 						DEBUG_PRINTF("right trigger %d\n", v);
+						if(mqtt != nullptr) mqtt->print_message("T %d", v);
 						break;
 					case LEFTTRIGGER:
 						DEBUG_PRINTF("left trigger %d\n", v);
+						if(mqtt != nullptr) mqtt->print_message("T %d", -v);
 						break;
 				}
 			}
