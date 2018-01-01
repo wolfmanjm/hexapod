@@ -17,22 +17,70 @@ Timed::~Timed()
 {
 }
 
+// uint64_t micros (void)
+// {
+// 	uint64_t now ;
+// 	struct  timespec ts ;
+// 
+// 	clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
+// 	now  = (uint64_t)ts.tv_sec * (uint64_t)1000000 + (uint64_t)(ts.tv_nsec / 1000) ;
+// 
+// 	return now;
+// }
+
+
+
 static inline uint64_t rdtsc(void)
 {
     uint32_t lo, hi;
-    uint64_t returnVal;
+	uint64_t returnVal;
+#ifdef RPI
+	lo= *timer;
+	hi= *(timer+1);
+#else
     /* We cannot use "=A", since this would use %rax on x86_64 */
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+#endif
     returnVal = hi;
     returnVal <<= 32;
     returnVal |= lo;
-
+	
     return returnVal;
 }
 
 /* TSC snapshot */
 bool Timed::timeInit(void)
 {
+#ifdef RPI
+#define TIMER_BASE 0x20003000 /* BCM 2835 System Timer */
+	int memfd;
+	void *timer_map;
+
+	memfd = open("/dev/mem",O_RDWR|O_SYNC);
+	if(memfd < 0)
+	{
+		printf("Mem open error\n");
+		return false;
+	}
+
+	timer_map = mmap(NULL,4096,PROT_READ|PROT_WRITE,
+					 MAP_SHARED,memfd,TIMER_BASE);
+
+	close(memfd);
+	if(timer_map == MAP_FAILED)
+	{
+		printf("Map failed\n");
+		return false;
+	}
+	// timer pointer
+	timer = (volatile unsigned *)timer_map;
+	++timer;    // timer lo 4 bytes
+				// timer hi 4 bytes available via *(timer+1)
+
+	/* Grab initial TSC snapshot */
+	tsc_init = rdtsc();
+
+#else
     int cpufreq_fd, ret;
     char buf[0x400];
     char * str = 0, * str2 = 0;
@@ -78,19 +126,23 @@ bool Timed::timeInit(void)
 
     /* Calculate nanoseconds per clock */
     clocks_per_ns = 1000/cpufreq;
-
     //printf("nanoseconds per clock %f\n", clocks_per_ns);
+#endif
     return true;
 }
 
 uint32_t Timed::micros( void )
 {
-    uint64_t tsc_cur = rdtsc(), diff = 0, divisor = 0;
+#ifdef RPI
+	return (uint32_t)(rdtsc() - tsc_init);
+#else
+	uint64_t tsc_cur = rdtsc(), diff = 0, divisor = 0;
 
     divisor = (cpufreq );
     diff = tsc_cur - tsc_init;
 
-    return (uint32_t) (diff / divisor);
+	return (uint32_t) (diff / divisor);
+#endif
 }
 
 void Timed::run(uint32_t iterations, std::function<void(void)> fnc)
