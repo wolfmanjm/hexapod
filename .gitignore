@@ -1,1 +1,8 @@
 BUILD/
+src/hexapod
+src/obj/
+stuff/
+.todo
+GPATH
+GRTAGS
+GTAGS
