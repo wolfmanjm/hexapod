@@ -18,9 +18,11 @@ OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 
 $(ODIR)/%.o: %.c $(DEPS)
+	@mkdir -p $(ODIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(ODIR)/%.o: %.cpp $(DEPS)
+	@mkdir -p $(ODIR)
 	$(CPP) -c -o $@ $< $(CPPFLAGS)
 
 hexapod: $(OBJ)
