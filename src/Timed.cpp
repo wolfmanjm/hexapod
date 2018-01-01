@@ -83,6 +83,10 @@ bool Timed::timeInit(void)
 	/* Grab initial TSC snapshot */
 	tsc_init = rdtsc();
 
+	usleep(1000000);
+	uint64_t t= rdtsc();
+	printf("testtime= %d\n", (int)(t-tsc_init));
+
 #else
     int cpufreq_fd, ret;
     char buf[0x400];

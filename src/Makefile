@@ -1,7 +1,7 @@
 IDIR =/opt/mraa/include
 CC=gcc
 CPP=g++
-CFLAGS=-I$(IDIR)
+CFLAGS=-I$(IDIR) -DRPI
 CPPFLAGS=$(CFLAGS) -std=gnu++11
 ODIR=obj
 LDIR=-L/opt/mraa/lib
