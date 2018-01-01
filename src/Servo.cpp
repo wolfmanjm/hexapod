@@ -9,6 +9,14 @@
 #include "PWM.h"
 #endif
 
+#ifdef RPI
+#define I2C_CH 1
+#define ENABLE_PIN 11 // BCM 17
+#else
+#define I2C_CH 6
+#define ENABLE_PIN 20 // GP12 GPIO-12 J18-7
+#endif
+
 const static float TAU = M_PI * 2;
 const static float PI2 = M_PI_2;
 
@@ -16,7 +24,7 @@ Servo::Servo()
 {
 #ifndef DUMMY
 	const int freqhz= 60;
-	servos = new adafruitss(6, 0x40);
+	servos = new adafruitss(I2C_CH, 0x40);
 	servos->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	// ss 1.787 90°
 	// PWM 1.51 90°
@@ -30,12 +38,12 @@ Servo::Servo()
 	// pwm->setFrequency(0, freq2hz);
 	// pwm->setFrequency(1, freq2hz);
 	#else
-	servos2 = new adafruitss(6, 0x41);
+	servos2 = new adafruitss(I2C_CH, 0x41);
 	servos2->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	#endif
 
 	// start with PWM disabled
-	enable_pin= new mraa::Gpio(20); // GP12 GPIO-12 J18-7
+	enable_pin= new mraa::Gpio(ENABLE_PIN); 
 	enable_pin->dir(mraa::DIR_OUT);
 	enableServos(false);
 

@@ -83,7 +83,7 @@ bool Timed::timeInit(void)
 	/* Grab initial TSC snapshot */
 	tsc_init = rdtsc();
 
-	usleep(1000000);
+	usleep(1000);
 	uint64_t t= rdtsc();
 	printf("testtime= %d\n", (int)(t-tsc_init));
 
