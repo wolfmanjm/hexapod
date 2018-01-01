@@ -169,7 +169,7 @@ void Leg::move(float px, float py, float pz, bool raw)
 	std::tie(hip, knee, ankle) = inverseKinematics(x, y, z);
 	if(debug_verbose) printf("move %s: hip: %f, knee %f, ankle: %f\n", name.c_str(), DEGREES(hip+PI2), DEGREES(knee+PI2), DEGREES(ankle+PI2));
 
-	if(isnan(hip) || isnan(knee) || isnan(ankle)) {
+	if(std::isnan(hip) || std::isnan(knee) || std::isnan(ankle)) {
 		fprintf(stderr, "move out of range: %s, %f, %f, %f, %f, %f, %f, %f, %f, %f\n", name.c_str(), px, py, pz, x, y, z, hip, knee, ankle);
 		throw std::range_error("move");
 	}
