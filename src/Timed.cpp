@@ -6,6 +6,7 @@
 #include <sys/sysinfo.h>
 #include <memory.h>
 #include <math.h>
+#include <sys/mman.h>
 
 Timed::Timed(float update_frequency)
 {
@@ -28,15 +29,17 @@ Timed::~Timed()
 // 	return now;
 // }
 
-
+#ifdef RPI
+static volatile unsigned *hires_timer;
+#endif
 
 static inline uint64_t rdtsc(void)
 {
     uint32_t lo, hi;
 	uint64_t returnVal;
 #ifdef RPI
-	lo= *timer;
-	hi= *(timer+1);
+	lo= *hires_timer;
+	hi= *(hires_timer+1);
 #else
     /* We cannot use "=A", since this would use %rax on x86_64 */
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
@@ -73,8 +76,8 @@ bool Timed::timeInit(void)
 		return false;
 	}
 	// timer pointer
-	timer = (volatile unsigned *)timer_map;
-	++timer;    // timer lo 4 bytes
+	hires_timer = (volatile unsigned *)timer_map;
+	++hires_timer;    // timer lo 4 bytes
 				// timer hi 4 bytes available via *(timer+1)
 
 	/* Grab initial TSC snapshot */

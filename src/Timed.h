@@ -19,7 +19,6 @@ public:
 private:
 	bool timeInit(void);
 	uint64_t tsc_init;
-	volatile unsigned *timer;
 	float cpufreq;
 	float clocks_per_ns;
 	uint32_t usleep_time;
