@@ -11,6 +11,11 @@
 Timed::Timed(float update_frequency)
 {
 	timeInit();
+    setFrequency(update_frequency);
+}
+
+void Timed::setFrequency(float update_frequency)
+{
 	this->usleep_time= round(1000000.0/update_frequency);
 }
 
@@ -22,10 +27,10 @@ Timed::~Timed()
 // {
 // 	uint64_t now ;
 // 	struct  timespec ts ;
-// 
+//
 // 	clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
 // 	now  = (uint64_t)ts.tv_sec * (uint64_t)1000000 + (uint64_t)(ts.tv_nsec / 1000) ;
-// 
+//
 // 	return now;
 // }
 
@@ -47,7 +52,7 @@ static inline uint64_t rdtsc(void)
     returnVal = hi;
     returnVal <<= 32;
     returnVal |= lo;
-	
+
     return returnVal;
 }
 

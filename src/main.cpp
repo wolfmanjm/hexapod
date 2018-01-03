@@ -621,7 +621,7 @@ int main(int argc, char *argv[])
 			case 'P': usleep(atoi(optarg) * 1000); break;
 			case 'E': servo.enableServos(atoi(optarg) == 1); break;
 
-			case 'f': update_frequency = atof(optarg); break;
+			case 'f': update_frequency = atof(optarg); timed.setFrequency(update_frequency); break;
 
 			case 'a': absol = true; break;
 			case 'b': MAX_RAISE = atof(optarg); break;
