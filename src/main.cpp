@@ -56,7 +56,7 @@ extern void raiseLeg(int leg, bool lift = true, int raise = 16, float speed = 60
 using Pos3 = std::tuple<int, float, float, float>;
 using Pos2 = std::tuple<int, float, float>;
 
-float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
+float update_frequency = 60.35; // Edison=61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
 Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
 float MAX_RAISE = 30; // 35 is safe too
 
@@ -698,17 +698,24 @@ int main(int argc, char *argv[])
 		// waveGait(1, x, y, speed, false);
 
 		uint32_t s = timed.micros();
+		uint32_t l= s;
 		uint32_t m1 = millis();
 		int iterations= 100;
 		int cnt= 0;
+		uint32_t times[iterations];
 		// execute the lambda iterations times at the specified frequency for timed
-		timed.run(iterations, [&cnt]() {
-			cnt++;
+		timed.run(iterations, [&times, &l, &cnt]() {
+			uint32_t us1 = timed.micros();
+			times[cnt++]= us1 - l;
+			l= us1;
 		});
 		uint32_t m2 = millis();
 		uint32_t e = timed.micros();
 		printf("update rate %u us for %d iterations= %fHz, cnt= %d\n", e - s, iterations, iterations * 1000000.0F / (e - s), cnt);
 		printf("millis time= %u\n", m2-m1);
+		for (int i = 0; i < iterations; ++i) {
+		    printf("time[%d]= %u\n", i, times[i]);
+		}
 
 	} else if(do_walk) {
 		switch(gait) {
