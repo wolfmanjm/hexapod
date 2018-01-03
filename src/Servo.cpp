@@ -106,6 +106,7 @@ static const int8_t SERVO_TRIM[Servo::NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
 void Servo::updateServo(uint8_t channel, float angle)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
+	if(servos == nullptr) throw std::invalid_argument("not inited");
 
 	if(!enabled) enableServos(true);
 
@@ -144,6 +145,7 @@ void Servo::updateServo(uint8_t channel, float angle)
 void Servo::move(uint8_t channel, float rads)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
+	if(servos == nullptr) throw std::invalid_argument("not inited");
 
 	rads = rads * SERVO_REVERSE[channel] + PI2;
 	while (rads > TAU) {
@@ -161,6 +163,8 @@ void Servo::move(uint8_t channel, float rads)
 
 void Servo::enableServos(bool on)
 {
+	if(servos == nullptr) throw std::invalid_argument("not inited");
+
 #ifndef DUMMY
 	enable_pin->write(on?0:1);
 #endif

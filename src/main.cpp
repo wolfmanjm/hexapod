@@ -12,6 +12,7 @@
 #include <atomic>
 #include <iostream>
 #include <csignal>
+#include <exception>
 
 #define RADIANS(a) ((a) * M_PI / 180.0F)
 #define DEGREES(r) ((r) * 180.0F / M_PI)
@@ -686,6 +687,9 @@ int main(int argc, char *argv[])
 			default: printf("Unknown Gait %d\n", gait);
 		}
 	}
+
+	}catch(std::exception& e ) {
+		std::cerr << "Caught unhandled exception (" << e.what() << "... Exiting\n";
 
 	}catch(...) {
 		fprintf(stderr, "Caught unhandled exception... Exiting\n");
