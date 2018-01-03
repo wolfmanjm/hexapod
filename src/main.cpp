@@ -497,6 +497,10 @@ void rawMove(int leg, int joint, float x, float y, float z, bool absol = false)
 
 void test_distance_sensor()
 {
+	// register signal and signal handler
+	signal(SIGTERM, signalHandler);
+	signal(SIGHUP, signalHandler);
+
 	VL6180X sensor;
 	sensor.init();
   	sensor.configureDefault();
@@ -689,7 +693,7 @@ int main(int argc, char *argv[])
 	}
 
 	}catch(std::exception& e ) {
-		std::cerr << "Caught unhandled exception (" << e.what() << "... Exiting\n";
+		std::cerr << "Caught unhandled exception (" << e.what() << ")... Exiting\n";
 
 	}catch(...) {
 		fprintf(stderr, "Caught unhandled exception... Exiting\n");
