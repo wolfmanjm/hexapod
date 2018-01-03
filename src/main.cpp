@@ -539,6 +539,22 @@ void test_distance_sensor()
 	}
 }
 
+// helper from wiringPi
+#include <sys/time.h>
+static uint64_t epochMilli= 0;
+static uint32_t millis (void)
+{
+  uint64_t now ;
+  struct  timespec ts ;
+
+  clock_gettime (CLOCK_MONOTONIC_RAW, &ts) ;
+  now  = (uint64_t)ts.tv_sec * (uint64_t)1000 + (uint64_t)(ts.tv_nsec / 1000000L) ;
+  if(epochMilli == 0) {
+    epochMilli= now;
+  }
+  return (uint32_t)(now - epochMilli) ;
+}
+
 int main(int argc, char *argv[])
 {
 	int reps = 0;
@@ -682,15 +698,17 @@ int main(int argc, char *argv[])
 		// waveGait(1, x, y, speed, false);
 
 		uint32_t s = timed.micros();
+		uint32_t m1 = millis();
 		int iterations= 100;
 		int cnt= 0;
 		// execute the lambda iterations times at the specified frequency for timed
 		timed.run(iterations, [&cnt]() {
 			cnt++;
 		});
+		uint32_t m2 = millis();
 		uint32_t e = timed.micros();
 		printf("update rate %u us for %d iterations= %fHz, cnt= %d\n", e - s, iterations, iterations * 1000000.0F / (e - s), cnt);
-
+		printf("millis time= %u\n", m2-m1);
 
 	} else if(do_walk) {
 		switch(gait) {
