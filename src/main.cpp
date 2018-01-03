@@ -677,10 +677,20 @@ int main(int argc, char *argv[])
 	}
 
 	if(do_test) {
-		waveGait(1, x, y, speed, true);
+		// waveGait(1, x, y, speed, true);
+		// waveGait(1, x, y + 80, speed, false);
+		// waveGait(1, x, y, speed, false);
 
-		waveGait(1, x, y + 80, speed, false);
-		waveGait(1, x, y, speed, false);
+		uint32_t s = timed.micros();
+		int iterations= 100;
+		int cnt= 0;
+		// execute the lambda iterations times at the specified frequency for timed
+		timed.run(iterations, [&cnt]() {
+			cnt++;
+		});
+		uint32_t e = timed.micros();
+		printf("update rate %u us for %d iterations= %fHz, cnt= %d\n", e - s, iterations, iterations * 1000000.0F / (e - s), cnt);
+
 
 	} else if(do_walk) {
 		switch(gait) {
