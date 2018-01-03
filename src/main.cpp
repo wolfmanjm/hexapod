@@ -2,6 +2,7 @@
 #include "Leg.h"
 #include "Timed.h"
 #include "helpers.h"
+#include "VL6180X.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -493,6 +494,46 @@ void rawMove(int leg, int joint, float x, float y, float z, bool absol = false)
 	}
 }
 
+void test_distance_sensor()
+{
+	VL6180X sensor;
+	sensor.init();
+  	sensor.configureDefault();
+
+	// Reduce range max convergence time and ALS integration
+	// time to 30 ms and 50 ms, respectively, to allow 10 Hz
+	// operation (as suggested by Table 6 ("Interleaved mode
+	// limits (10 Hz operation)") in the datasheet).
+	// sensor.writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 30);
+	// sensor.writeReg16Bit(VL6180X::SYSALS__INTEGRATION_PERIOD, 50);
+
+	sensor.setTimeout(500);
+
+	// stop continuous mode if already active
+	//sensor.stopContinuous();
+	// in case stopContinuous() triggered a single-shot
+	// measurement, wait for it to complete
+	//delay(300);
+	// start interleaved continuous mode with period of 100 ms
+	//sensor.startInterleavedContinuous(100);
+
+	while(!doabort) {
+		// ambient= sensor.readAmbientContinuous();
+		// if (sensor.timeoutOccurred()) { timeout= true; } else { timeout= false; }
+		// range= sensor.readRangeContinuous();
+
+		uint8_t range= sensor.readRangeSingle();
+		if (sensor.timeoutOccurred()) {
+			printf("Sensor timed out\n");
+			break;
+		}
+
+		printf("Range: %d\n", range);
+
+		usleep(500000);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	int reps = 0;
@@ -505,6 +546,8 @@ int main(int argc, char *argv[])
 	uint8_t gait = 0;
 	bool do_test = false;
 
+	//servo.init();
+
 	// setup an array of legs, using this as they are not copyable.
 	//  position angle, home angle, ankle, knee, hip
 	legs.emplace_back("front left",    60,  -60,  0,  1,  2, servo); // front left
@@ -515,7 +558,7 @@ int main(int argc, char *argv[])
 	legs.emplace_back("front right",  120, -120, 15, 16, 17, servo); // front right
 
 	try{
-	while ((c = getopt (argc, argv, "hH:RDaAmMc:l:j:f:x:y:z:s:S:TIL:W:JP:vE:b:B:")) != -1) {
+	while ((c = getopt (argc, argv, "hH:RDaAmMc:l:j:f:x:y:z:s:S:TIL:W:JP:vVE:b:B:")) != -1) {
 		switch (c) {
 			case 'h':
 				printf("Usage:\n");
@@ -543,11 +586,13 @@ int main(int argc, char *argv[])
 				printf(" -P m pause m milliseconds\n");
 				printf(" -E n enable or disable servos\n");
 				printf(" -T run test\n");
+				printf(" -V run VL6180X test\n");
 				printf(" -v verbose debug\n");
 				return 1;
 
 			case 'H': mqtt_start(optarg, handle_request); break;
 			case 'v': debug_verbose = true;  break;
+			case 'V': test_distance_sensor(); break;
 
 			case 'D': printf("Hit any key...\n"); getchar(); return 0;
 

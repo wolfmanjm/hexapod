@@ -22,6 +22,11 @@ const static float PI2 = M_PI_2;
 
 Servo::Servo()
 {
+	servos= nullptr;
+}
+
+bool Servo::init()
+{
 #ifndef DUMMY
 	const int freqhz= 60;
 	servos = new adafruitss(I2C_CH, 0x40);
@@ -43,7 +48,7 @@ Servo::Servo()
 	#endif
 
 	// start with PWM disabled
-	enable_pin= new mraa::Gpio(ENABLE_PIN); 
+	enable_pin= new mraa::Gpio(ENABLE_PIN);
 	enable_pin->dir(mraa::DIR_OUT);
 	enableServos(false);
 
@@ -57,18 +62,20 @@ Servo::Servo()
 
 Servo::~Servo()
 {
-	enableServos(false);
-	delete servos;
+	if(servos != nullptr) {
+		enableServos(false);
+		delete servos;
 
 #ifndef DUMMY
-	delete enable_pin;
+		delete enable_pin;
 
 #ifdef USEGPIO
-	delete pwm;
+		delete pwm;
 #else
-	delete servos2;
+		delete servos2;
 #endif
 #endif
+	}
 }
 
 // defines which servos need to be reversed
