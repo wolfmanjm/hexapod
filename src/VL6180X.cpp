@@ -6,7 +6,11 @@
 // Defines /////////////////////////////////////////////////////////////////////
 
 #define ADDRESS_DEFAULT 0b0101001
+#ifdef RPI
 #define I2C_CH 1
+#else
+#define I2C_CH 6
+#endif
 
 #define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 

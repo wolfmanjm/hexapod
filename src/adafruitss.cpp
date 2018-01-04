@@ -53,7 +53,7 @@ adafruitss::adafruitss(int bus,int i2c_address)
     mraa_init();
 
 
-    m_i2c = mraa_i2c_init(bus);
+    m_i2c = mraa_i2c_init_raw(bus);
 
     pca9685_addr =  i2c_address;
     mraa_i2c_address(m_i2c, pca9685_addr);
