@@ -56,7 +56,7 @@ extern void raiseLeg(int leg, bool lift = true, int raise = 16, float speed = 60
 using Pos3 = std::tuple<int, float, float, float>;
 using Pos2 = std::tuple<int, float, float>;
 
-float update_frequency = 60.35; // Edison=61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
+float update_frequency = 61.5; // 60Hz update frequency we need to be a little faster to make up for overhead
 Timed timed(update_frequency); // timer that repeats a given function at the given frequency (also provides micros())
 float MAX_RAISE = 30; // 35 is safe too
 
@@ -512,7 +512,7 @@ void test_distance_sensor()
 	// sensor.writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 30);
 	// sensor.writeReg16Bit(VL6180X::SYSALS__INTEGRATION_PERIOD, 50);
 
-	sensor.setTimeout(500);
+	//sensor.setTimeout(500);
 
 	// stop continuous mode if already active
 	//sensor.stopContinuous();
@@ -530,10 +530,9 @@ void test_distance_sensor()
 		uint8_t range= sensor.readRangeSingle();
 		if (sensor.timeoutOccurred()) {
 			printf("Sensor timed out\n");
-			break;
+		}else{
+			printf("Range: %d\n", range);
 		}
-
-		printf("Range: %d\n", range);
 
 		usleep(500000);
 	}
@@ -697,6 +696,7 @@ int main(int argc, char *argv[])
 		// waveGait(1, x, y + 80, speed, false);
 		// waveGait(1, x, y, speed, false);
 
+		// test out timing
 		uint32_t s = timed.micros();
 		uint32_t l= s;
 		uint32_t m1 = millis();
