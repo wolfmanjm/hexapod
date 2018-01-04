@@ -1,5 +1,7 @@
 #include "VL6180X.h"
 
+#include <exception>
+#include <system_error>
 
 // Defines /////////////////////////////////////////////////////////////////////
 
@@ -13,7 +15,10 @@
 VL6180X::VL6180X(void)
 {
   mraa_init();
-  m_i2c = mraa_i2c_init(I2C_CH);
+  m_i2c = mraa_i2c_init_raw(I2C_CH);
+  if(m_i2c == NULL) {
+    throw std::range_error("mraa_i2c_init failed");
+  }
 
   address = ADDRESS_DEFAULT;
 

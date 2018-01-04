@@ -512,7 +512,7 @@ void test_distance_sensor()
 	// sensor.writeReg(VL6180X::SYSRANGE__MAX_CONVERGENCE_TIME, 30);
 	// sensor.writeReg16Bit(VL6180X::SYSALS__INTEGRATION_PERIOD, 50);
 
-	//sensor.setTimeout(500);
+	sensor.setTimeout(500);
 
 	// stop continuous mode if already active
 	//sensor.stopContinuous();
