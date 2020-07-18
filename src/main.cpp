@@ -105,7 +105,7 @@ void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true)
 	}
 
 	// calculate iterations and the amount to slice each move
-	uint32_t iterations = roundf(time * update_frequency);
+	uint32_t iterations= roundf(time * update_frequency);
 	if(iterations == 0) return;
 
 	float slice = 1.0F / iterations; // the fraction amount each move makes
@@ -361,6 +361,7 @@ bool handle_request(const char *req)
 	switch(c) {
 		case 'G':
 			v = std::stoi(cmd, &p1);
+			debug_printf("gait set to: %d\n", v);
 			switch(v) {
 				case 1: gait = NONE; break;
 				case 2: gait = WAVE; break;
@@ -369,7 +370,7 @@ bool handle_request(const char *req)
 				case 5: gait = WAVE_ROTATE; break;
 				case 6: gait = NONE; doSafeHome= true; break;
 				case 7: gait= NONE; doIdlePosition= true; break;
-				case 8: doStandUp= true; break;
+				case 8: gait= NONE; doStandUp= true; break;
 				default: printf("Unknown button: %d\n", v);
 			}
 			break;

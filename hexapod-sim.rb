@@ -759,8 +759,8 @@ timer = lambda do |value|
   end
 
   if $animate
-    $gait= RippleGait.new unless $gait
-    #$gait= TripodGait.new unless $gait
+    #$gait= RippleGait.new unless $gait
+    $gait= TripodGait.new unless $gait
     #$gait= WaveRotateGait.new unless $gait
     $gait.walk
   end

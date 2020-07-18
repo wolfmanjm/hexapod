@@ -143,8 +143,8 @@ public:
 		this->host = host;
 		this->topic = topic;
 		connect_async(host,     // non blocking connection to broker request
-					  port,
-					  keepalive);
+		              port,
+		              keepalive);
 		loop_start();            // Start thread managing connection / publish / subscribe
 	}
 
@@ -156,18 +156,18 @@ public:
 
 	bool send_message(const char *_message)
 	{
-		int ret = publish(NULL, this->topic, strlen(_message), _message, 1, false);
+		int ret = publish(NULL, this->topic, strlen(_message), _message, 0, false);
 		return ( ret == MOSQ_ERR_SUCCESS );
 	}
 
 	bool print_message(const char *format, ...)
 	{
-	    va_list args;
-	    va_start(args, format);
-	    char buffer[132]; // max length
-	    int n= vsnprintf(buffer, sizeof(buffer), format, args);
-	    va_end(args);
-		int ret = publish(NULL, this->topic, n, buffer, 1, false);
+		va_list args;
+		va_start(args, format);
+		char buffer[132]; // max length
+		int n = vsnprintf(buffer, sizeof(buffer), format, args);
+		va_end(args);
+		int ret = publish(NULL, this->topic, n, buffer, 0, false);
 		return ( ret == MOSQ_ERR_SUCCESS );
 	}
 };
@@ -179,17 +179,17 @@ int map(int x, int in_min, int in_max, int out_min, int out_max)
 	return (x - in_min) * (out_max - out_min + 1) / (in_max - in_min + 1) + out_min;
 }
 
-volatile bool doabort= false;
-int fd= -1;
+volatile bool doabort = false;
+int fd = -1;
 void signalHandler( int signum )
 {
-    std::cout << "Interrupt signal (" << signum << ") received.\n";
-    if(signum == SIGTERM){
-    	doabort= true;
-    	printf("Exiting\n");
-    	close(fd);
-    	fd= -1;
-    }
+	std::cout << "Interrupt signal (" << signum << ") received.\n";
+	if(signum == SIGTERM) {
+		doabort = true;
+		printf("Exiting\n");
+		close(fd);
+		fd = -1;
+	}
 }
 
 std::map<int, int> button_map = { {right_thumb, 1}, {left_thumb, 1}, {triangle, 3}, {circle, 4}, {cross, 2}, {square, 5}, {select, 6}, {P3,  7}, {start, 8} };
@@ -202,10 +202,10 @@ int main (int argc, char **argv)
 	char name[256] = "Unknown";
 	int abs[5];
 	Mqtt *mqtt = nullptr;
-	bool connected= false;
+	bool connected = false;
 
 	if (argc < 2) {
-		printf("Usage: evtest /dev/input/eventX [mqtt host]\n");
+		printf("Usage: %s /dev/input/eventX [mqtt host]\n", argv[0]);
 		printf("Where X = input device number\n");
 		return 1;
 	}
@@ -216,12 +216,12 @@ tryagain:
 	signal(SIGHUP, signalHandler);
 
 	while(!connected) {
-	 	if ((fd = open(argv[1], O_RDONLY)) < 0) {
-	 		for (int i = 0; i < 10; ++i) {
-	 			usleep(500000); // wait a little longer
-	 			if(doabort) goto aborted;
-	 		}
-	 		continue;
+		if ((fd = open(argv[1], O_RDONLY)) < 0) {
+			for (int i = 0; i < 10; ++i) {
+				usleep(500000); // wait a little longer
+				if(doabort) goto aborted;
+			}
+			continue;
 		}
 
 		printf("Input driver version is %d.%d.%d\n", version >> 16, (version >> 8) & 0xff, version & 0xff);
@@ -235,7 +235,7 @@ tryagain:
 			fprintf(stderr, "device %s is not a Playstation GamePad: %s\n", argv[1], name);
 			exit(1);
 		}
-		connected= true;
+		connected = true;
 	}
 
 	if(argc > 2) {
@@ -265,7 +265,7 @@ tryagain:
 				if(mqtt != nullptr && button_map.find(ev[i].code) != button_map.end()) {
 					mqtt->print_message("G %d", button_map[ev[i].code]);
 
-				}else{
+				} else {
 
 					switch(ev[i].code) {
 						case triangle:
@@ -288,6 +288,12 @@ tryagain:
 							break;
 						case P3:
 							DEBUG_PRINTF("P3\n");
+							break;
+						case left_thumb:
+							DEBUG_PRINTF("left thumb\n");
+							break;
+						case right_thumb:
+							DEBUG_PRINTF("right thumb\n");
 							break;
 
 						case HatUp:
@@ -323,11 +329,11 @@ tryagain:
 				//printf("Joystick: code %d, value %d\n", ev[i].code, ev[i].value);
 #ifdef SIXAD
 				// sixad returns +/- 10 --> 128 as 10 is the dead zone, map it to 1 --> 100
-				int iv= ev[i].value;
-				int v= 0;
+				int iv = ev[i].value;
+				int v = 0;
 				if(iv > 0) {
 					v =  map(std::abs(iv), 10, 128, 1, 100);
-				}else if(iv < 0) {
+				} else if(iv < 0) {
 					v =  -map(std::abs(iv), 10, 128, 1, 100);
 				}
 				//printf("value: %d\n", v);
@@ -335,13 +341,13 @@ tryagain:
 #else
 				int v = ev[i].value - 128;
 				if(ev[i].code == RIGHTTRIGGER || ev[i].code == LEFTTRIGGER) {
-					v = (v*100) / 128;
+					v = (v * 100) / 128;
 
 				} else {
-					if(v > -10 && v < 10){
+					if(v > -10 && v < 10) {
 						v = 0;
-					}else{
-						v = (v*100) / 128;
+					} else {
+						v = (v * 100) / 128;
 					}
 				}
 #endif
