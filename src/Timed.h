@@ -6,6 +6,12 @@
 
 #include <functional>
 
+#define USE_CHRONO 1
+
+#if USE_CHRONO
+#include <chrono>
+#endif
+
 class Timed
 {
 public:
@@ -18,8 +24,12 @@ public:
 
 private:
 	bool timeInit(void);
+	uint32_t usleep_time;
+#if USE_CHRONO
+	std::chrono::steady_clock::time_point bot;
+#else
 	uint64_t tsc_init;
 	float cpufreq;
 	float clocks_per_ns;
-	uint32_t usleep_time;
+#endif
 };
