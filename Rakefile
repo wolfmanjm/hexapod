@@ -58,6 +58,9 @@ end
 # Install the handler
 Rake.application.add_loader('d', DfileLoader.new)
 
+# for RPI
+#ROOTDIR = "/aux/Stuff/rpi-tools/arm-bcm2708/arm-linux-gnueabihf/bin"
+
 ROOTDIR ="/datadisk/aux/Stuff/edison/poky-edison/1.6.1"
 TOOLSDIR = "#{ROOTDIR}/sysroots/i686-pokysdk-linux/usr/bin/i586-poky-linux"
 TOOLSBIN = "#{TOOLSDIR}/i586-poky-linux-"
@@ -71,6 +74,9 @@ SIZE = "#{TOOLSBIN}size"
 AR = "#{TOOLSBIN}ar"
 
 ARFLAGS = 'cr'
+
+current_version= `#{CC} -dumpversion`.chomp
+puts "Current GCC version is #{current_version}"
 
 # include a defaults file if present
 load 'rakefile.defaults' if File.exists?('rakefile.defaults')

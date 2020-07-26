@@ -70,6 +70,7 @@ static float max_stride = 70;
 static float max_angle = 38;
 static float min_stride = 5;
 static float max_speed = 200;
+static float stride_time = 0.300; // time for each stride in seconds for distance mode instead of speed mode
 
 enum GAIT { NONE, WAVE, TRIPOD, WAVE_ROTATE, TRIPOD_ROTATE };
 static std::atomic<GAIT>  gait {NONE};
@@ -83,6 +84,7 @@ static std::atomic<float> body_height {TIBIA}; // Body height.
 static volatile bool doSafeHome= false;
 static volatile bool doIdlePosition= false;
 static volatile bool doStandUp= false;
+static volatile bool velocity_mode= false; // determines if XY control speed or stride
 
 // Interpolate a list of moves within the given time in seconds and issue to servos at the update rate
 void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true)
@@ -452,6 +454,18 @@ bool handle_request(const char *req)
 			x = std::stof(cmd.substr(p1), &p2);
 			servo.updateServo(v, x);
 			debug_printf("Set Servo %d to %f°\n", v, x);
+			break;
+
+		case 'B':
+			// set time for each stride - parameters: time in seconds
+			stride_time= std::stof(cmd.substr(p1), &p2);
+			debug_printf("Set Stride time to %f secs\n", stride_time);
+			break;
+
+		case 'C':
+			// set velocity mode or stride mode
+			velocity_mode= std::stoi(cmd.substr(p1), &p2) == 0;
+			debug_printf("Set velocity mode to %d\n", velocity_mode);
 			break;
 
 		case 'E':
