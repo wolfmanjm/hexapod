@@ -1,0 +1,34 @@
+IDIR =../mraa/api
+CC=/aux/Stuff/rpi-tools/arm-bcm2708/arm-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc
+CPP=/aux/Stuff/rpi-tools/arm-bcm2708/arm-linux-gnueabihf/bin/arm-linux-gnueabihf-g++
+CFLAGS=-I$(IDIR) -I/aux/Stuff/mosquitto-1.3.4/build/include
+CPPFLAGS=$(CFLAGS) -std=gnu++11
+ODIR=obj
+LDIR=-L../mraa/build/src/ -L/aux/Stuff/mosquitto-1.3.4/build/lib
+
+LIBS=-lmraa -lmosquitto
+
+#_DEPS = hellomake.h
+#DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
+DEPS= $(wildcard *.h)
+SRC=$(wildcard *.cpp)
+
+_OBJ = $(SRC:.cpp=.o)
+OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+
+
+$(ODIR)/%.o: %.c $(DEPS)
+	@mkdir -p $(ODIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+$(ODIR)/%.o: %.cpp $(DEPS)
+	@mkdir -p $(ODIR)
+	$(CPP) -c -o $@ $< $(CPPFLAGS)
+
+hexapod: $(OBJ)
+	$(CPP) -o $@ $^ $(CPFLAGS) $(LDIR) $(LIBS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(ODIR)/*.o core hexapod
