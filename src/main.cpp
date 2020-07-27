@@ -11,6 +11,7 @@
 #include <atomic>
 #include <iostream>
 #include <csignal>
+#include <exception>
 
 #define RADIANS(a) ((a) * M_PI / 180.0F)
 #define DEGREES(r) ((r) * 180.0F / M_PI)
@@ -529,6 +530,8 @@ int main(int argc, char *argv[])
 	legs.emplace_back("middle right", 180,  180, 12, 13, 14, servo); // middle right
 	legs.emplace_back("front right",  120, -120, 15, 16, 17, servo); // front right
 
+	servo.init();
+
 	try{
 	while ((c = getopt (argc, argv, "hH:RDaAmMc:l:j:f:x:y:z:s:S:TIL:W:JP:vE:b:B:")) != -1) {
 		switch (c) {
@@ -570,7 +573,7 @@ int main(int argc, char *argv[])
 			case 'P': usleep(atoi(optarg) * 1000); break;
 			case 'E': servo.enableServos(atoi(optarg) == 1); break;
 
-			case 'f': update_frequency = atof(optarg); break;
+			case 'f': update_frequency = atof(optarg); timed.setFrequency(update_frequency); break;
 
 			case 'a': absol = true; break;
 			case 'b': MAX_RAISE = atof(optarg); break;
@@ -656,6 +659,9 @@ int main(int argc, char *argv[])
 			default: printf("Unknown Gait %d\n", gait);
 		}
 	}
+
+	}catch(std::exception& e ) {
+		std::cerr << "Caught unhandled exception (" << e.what() << ")... Exiting\n";
 
 	}catch(...) {
 		fprintf(stderr, "Caught unhandled exception... Exiting\n");

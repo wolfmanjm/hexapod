@@ -32,6 +32,7 @@ class Servo
 public:
 	Servo();
 	~Servo();
+	bool init();
 	void move(uint8_t port, float rads);
 	void updateServo(uint8_t channel, float angle);
 	void enableServos(bool on);

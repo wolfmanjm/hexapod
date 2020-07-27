@@ -1,7 +1,7 @@
 IDIR =../mraa/api
 CC=/aux/Stuff/rpi-tools/arm-bcm2708/arm-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc
 CPP=/aux/Stuff/rpi-tools/arm-bcm2708/arm-linux-gnueabihf/bin/arm-linux-gnueabihf-g++
-CFLAGS=-I$(IDIR) -I/aux/Stuff/mosquitto-1.3.4/build/include
+CFLAGS= -g -DRPI -I$(IDIR) -I/aux/Stuff/mosquitto-1.3.4/build/include
 CPPFLAGS=$(CFLAGS) -std=gnu++11
 ODIR=obj
 LDIR=-L../mraa/build/src/ -L/aux/Stuff/mosquitto-1.3.4/build/lib

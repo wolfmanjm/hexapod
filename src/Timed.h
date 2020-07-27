@@ -17,6 +17,7 @@ class Timed
 public:
 	Timed(float update_frequency);
 	~Timed();
+	void setFrequency(float update_frequency);
 
 	// execute the lambda iterations times at the update frequency
 	void run(uint32_t iterations, std::function<void(void)> fnc);

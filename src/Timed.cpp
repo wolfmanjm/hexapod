@@ -10,6 +10,11 @@
 Timed::Timed(float update_frequency)
 {
 	timeInit();
+    setFrequency(update_frequency);
+}
+
+void Timed::setFrequency(float update_frequency)
+{
 	this->usleep_time= round(1000000.0/update_frequency);
 }
 
