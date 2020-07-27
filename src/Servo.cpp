@@ -9,14 +9,27 @@
 #include "PWM.h"
 #endif
 
+#ifdef RPI
+#define I2C_CH 1
+#define ENABLE_PIN 11 // BCM 17
+#else
+#define I2C_CH 6
+#define ENABLE_PIN 20 // GP12 GPIO-12 J18-7
+#endif
+
 const static float TAU = M_PI * 2;
 const static float PI2 = M_PI_2;
 
 Servo::Servo()
 {
+	servos= nullptr;
+}
+
+bool Servo::init()
+{
 #ifndef DUMMY
 	const int freqhz= 60;
-	servos = new adafruitss(6, 0x40);
+	servos = new adafruitss(I2C_CH, 0x40);
 	servos->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	// ss 1.787 90°
 	// PWM 1.51 90°
@@ -30,12 +43,12 @@ Servo::Servo()
 	// pwm->setFrequency(0, freq2hz);
 	// pwm->setFrequency(1, freq2hz);
 	#else
-	servos2 = new adafruitss(6, 0x41);
+	servos2 = new adafruitss(I2C_CH, 0x41);
 	servos2->setPWMFreq(freqhz); // actual 60Hz is 17.39 57.5Hz
 	#endif
 
 	// start with PWM disabled
-	enable_pin= new mraa::Gpio(20); // GP12 GPIO-12 J18-7
+	enable_pin= new mraa::Gpio(ENABLE_PIN);
 	enable_pin->dir(mraa::DIR_OUT);
 	enableServos(false);
 
@@ -49,18 +62,20 @@ Servo::Servo()
 
 Servo::~Servo()
 {
-	enableServos(false);
-	delete servos;
+	if(servos != nullptr) {
+		enableServos(false);
+		delete servos;
 
 #ifndef DUMMY
-	delete enable_pin;
+		delete enable_pin;
 
 #ifdef USEGPIO
-	delete pwm;
+		delete pwm;
 #else
-	delete servos2;
+		delete servos2;
 #endif
 #endif
+	}
 }
 
 // defines which servos need to be reversed
@@ -91,6 +106,7 @@ static const int8_t SERVO_TRIM[Servo::NSERVOS]{0,0,0,0,0,0,0,0,0,0,0,0};
 void Servo::updateServo(uint8_t channel, float angle)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
+	if(servos == nullptr) throw std::invalid_argument("not inited");
 
 	if(!enabled) enableServos(true);
 
@@ -129,6 +145,7 @@ void Servo::updateServo(uint8_t channel, float angle)
 void Servo::move(uint8_t channel, float rads)
 {
 	if(channel >= NSERVOS) throw std::invalid_argument("channel");
+	if(servos == nullptr) throw std::invalid_argument("not inited");
 
 	rads = rads * SERVO_REVERSE[channel] + PI2;
 	while (rads > TAU) {
@@ -146,6 +163,8 @@ void Servo::move(uint8_t channel, float rads)
 
 void Servo::enableServos(bool on)
 {
+	if(servos == nullptr) throw std::invalid_argument("not inited");
+
 #ifndef DUMMY
 	enable_pin->write(on?0:1);
 #endif
