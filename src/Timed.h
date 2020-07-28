@@ -6,7 +6,11 @@
 
 #include <functional>
 
+#ifdef RPI
 #define USE_CHRONO 1
+#else
+#define USE_CHRONO 0
+#endif
 
 #if USE_CHRONO
 #include <chrono>

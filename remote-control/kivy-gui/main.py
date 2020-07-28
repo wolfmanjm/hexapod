@@ -5,7 +5,7 @@ from kivy.garden.joystick import Joystick
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.lang import Builder
-from kivy.properties import BooleanProperty
+from kivy.properties import BooleanProperty, NumericProperty
 
 # MQTT client
 import paho.mqtt.client as mqtt
@@ -83,19 +83,19 @@ Builder.load_string('''
             height: 40
             on_state: root.do_idle('1' if self.state == 'down' else '0')
         ToggleButton:
-            text: 'Velocity mode'
+            text: 'Velocity mode' if self.state == 'down' else 'Time mode'
             size_hint_y: None
             height: 40
-            on_state: root.set_mode('1' if self.state == 'down' else '0')
+            on_state: root.set_mode(True if self.state == 'down' else False)
         BoxLayout:
             orientation: 'vertical'
             Label:
-                text: 'Stride' if root.velocity_mode else 'Time'
+                text: 'Stride: {}%'.format(root.stride_pcnt) if root.velocity_mode else 'Time: {}s'.format(root.stride_time)
                 size_hint_x: None
                 width: 100
             Knob:
                 size: 100, 100
-                value: 50
+                value: 33
                 knobimg_source: "img/knob_black.png"
                 markeroff_color: 0.0, 0.0, 0.0, 1
                 knobimg_size: 0.9
@@ -151,8 +151,15 @@ Builder.load_string('''
 ''')
 
 
+def maprange(a, b, s):
+    (a1, a2), (b1, b2) = a, b
+    return b1 + ((s - a1) * (b2 - b1) / (a2 - a1))
+
+
 class Controller(BoxLayout):
     velocity_mode = BooleanProperty(False)
+    stride_time = NumericProperty(0.3)
+    stride_pcnt = NumericProperty(50)
 
     gait_lut = {'None': 1, 'Wave': 2, 'Tripod': 3, 'TripodRotate': 4, 'WaveRotate': 5, 'Relax': 7, 'Standup': 8}
 
@@ -164,15 +171,19 @@ class Controller(BoxLayout):
         mqttc.publish('quadruped/commands', "E {}".format(v), qos=0)
 
     def change_time(self, arg, v):
-        if velocity_mode:
-            mqttc.publish('quadruped/commands', "S {}".format(round(v, 2), qos=0))
+        if self.velocity_mode:
+            # percentage of maximum stride
+            self.stride_pcnt = round(maprange([0, 100], [.1, 100], v), 2)
+            mqttc.publish('quadruped/commands', "S {}".format(self.stride_pcnt, qos=0))
         else:
-            mqttc.publish('quadruped/commands', "B {}".format(round(v, 2), qos=0))
+            # time in seconds
+            self.stride_time = round(maprange([0, 100], [.01, 1.0], v), 2)
+            mqttc.publish('quadruped/commands', "B {}".format(self.stride_time, qos=0))
 
     def set_mode(self, f):
-        self.velocity_mode = f == '1'
-        print('set_mode: {}'.format(self.velocity_mode))
-        mqttc.publish('quadruped/commands', "C {}".format(f), qos=0)
+        self.velocity_mode = f
+        print('set velocity mode: {}'.format(self.velocity_mode))
+        mqttc.publish('quadruped/commands', "C {}".format(0 if self.velocity_mode else 1), qos=0)
 
 
 class ControlApp(App):

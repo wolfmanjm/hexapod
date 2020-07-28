@@ -71,7 +71,7 @@ static float max_stride = 70;
 static float max_angle = 38;
 static float min_stride = 5;
 static float max_speed = 200;
-static float stride_time = 0.300; // time for each stride in seconds for distance mode instead of speed mode
+static float stride_time = 0.300; // time for each stride in seconds for distance mode instead of velocity mode
 
 enum GAIT { NONE, WAVE, TRIPOD, WAVE_ROTATE, TRIPOD_ROTATE };
 static std::atomic<GAIT>  gait {NONE};
@@ -85,7 +85,7 @@ static std::atomic<float> body_height {TIBIA}; // Body height.
 static volatile bool doSafeHome= false;
 static volatile bool doIdlePosition= false;
 static volatile bool doStandUp= false;
-static volatile bool velocity_mode= false; // determines if XY control speed or stride
+static volatile bool velocity_mode= false; // determines if XY control velocity or stride
 
 // Interpolate a list of moves within the given time in seconds and issue to servos at the update rate
 void interpolatedMoves(std::vector<Pos3> pos, float time, bool relative = true)
@@ -290,16 +290,32 @@ void joystickControl()
 			last_gait = gait;
 
 			if(gait != NONE && gait <  WAVE_ROTATE && (std::abs(current_x) > 0.0001F || std::abs(current_y) > 0.0001F))  {
-				// current_x and current_y are speed percentage in that direction
-				// calculate the vector of movement in percentage
-				float d = sqrtf(powf(current_x, 2) + powf(current_y, 2)); // vector size
+				// current_x and current_y are speed percentage in that direction in velocity mode
+				// and they are the percentage of current stride in stride mode
+				float x, y, speed;
 
-				float x = current_stride * current_x / d; // normalize for proportion move in X, this is stride in mm in X
-				float y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
+				if(velocity_mode) {
+					// calculate the vector of movement in percentage
+					float d = sqrtf(powf(current_x, 2) + powf(current_y, 2)); // vector size
 
-				float speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
-				if(speed < 20) speed = 20;
-				//printf("x: %f, y: %f, d: %f, speed: %f\n", x, y, d, speed);
+					x = current_stride * current_x / d; // normalize for proportion move in X, this is stride in mm in X
+					y = current_stride * current_y / d; // normalize for proportion move in Y, this is stride in mm in Y
+
+					speed = max_speed * (d / 100.0F); // adjust speed based on size of movement vector
+					if(speed < 20) speed = 20;
+
+				}else {
+					// stride mode
+					x = current_stride * current_x/100.0F;
+					y = current_stride * current_y/100.0F;
+
+					// we need to calculate speed to make sure the move executes in the fixed time
+					float d = sqrtf(powf(x, 2) + powf(y, 2)); // vector size
+					speed = d/stride_time;
+					if(speed > max_speed) speed= max_speed;
+					else if(speed < 10) speed = 10;
+				}
+				//printf("x: %f, y: %f, speed: %f\n", x, y, speed);
 
 				// execute one entire step which will move body over the ground by current_stride mm
 				switch(gait) {
@@ -459,13 +475,13 @@ bool handle_request(const char *req)
 
 		case 'B':
 			// set time for each stride - parameters: time in seconds
-			stride_time= std::stof(cmd.substr(p1), &p2);
+			stride_time= std::stof(cmd, &p2);
 			debug_printf("Set Stride time to %f secs\n", stride_time);
 			break;
 
 		case 'C':
 			// set velocity mode or stride mode
-			velocity_mode= std::stoi(cmd.substr(p1), &p2) == 0;
+			velocity_mode= std::stoi(cmd, &p2) == 0;
 			debug_printf("Set velocity mode to %d\n", velocity_mode);
 			break;
 

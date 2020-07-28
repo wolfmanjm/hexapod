@@ -58,6 +58,8 @@ bool Servo::init()
 	for (int i = 0; i < NSERVOS; ++i) {
 		current_angle[i]= 9999.9; // set to an angle we would never have set
 	}
+
+	return true;
 }
 
 Servo::~Servo()
