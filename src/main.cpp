@@ -329,10 +329,19 @@ void joystickControl()
 				gait_changed = false;
 
 			} else if(gait >= WAVE_ROTATE && std::abs(current_rotate) > 0.001F) {
-				float speed = max_speed * std::abs(current_rotate) / 100.0F ;
-				if(speed < 10) speed = 10;
-				float a = current_angle;
-				if(current_rotate < 0) a = -a; // direction of rotate
+				float speed, a;
+				if(velocity_mode) {
+					speed = max_speed * std::abs(current_rotate) / 100.0F ;
+					if(speed < 10) speed = 10;
+					a = current_angle;
+					if(current_rotate < 0) a = -a; // direction of rotate
+				}else{
+					// angle to rotate is a percentage of the passed in rotations
+					a= current_angle * current_rotate/100.0F;
+					speed = a/stride_time;
+					if(speed > max_speed) speed= max_speed;
+					else if(speed < 10) speed = 10;
+				}
 
 				switch(gait) {
 					case WAVE_ROTATE:
